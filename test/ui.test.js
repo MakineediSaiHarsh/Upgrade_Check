@@ -167,7 +167,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   assert.match(elements['old-source'].textContent, /exact model or annual units were not visible/);
   assert.match(elements['old-identified'].textContent, /annual units unknown/);
   assert.equal(photoCalls, 2);
-  assert.equal(stored.get('upgradecheck_ai_attempts_v2'), '2');
+  assert.equal(stored.get('upgradecheck_ai_attempts_v3'), '2');
   assert.match(elements['ai-remaining'].textContent, /3 of 5/);
   photoSuggestion = {index:1,basis:'brand_and_type'};
   await elements['old-read-label'].listeners.click();
@@ -192,9 +192,9 @@ test('model-first page calculates locally and handles missing and cross-type mod
   await elements['explain-button'].listeners.click();
   assert.equal(explainCalls, 1);
   assert.match(elements['ai-message'].textContent, /used five AI attempts/);
-  stored.set('upgradecheck_ai_attempts_v2', '0');
+  stored.set('upgradecheck_ai_attempts_v3', '0');
   photoFailure = true;
   await elements['old-read-label'].listeners.click();
-  assert.equal(stored.get('upgradecheck_ai_attempts_v2'), '0');
+  assert.equal(stored.get('upgradecheck_ai_attempts_v3'), '0');
   assert.equal(elements['old-photo-status'].textContent, 'Gemini rejected the API key. Check GEMINI_API_KEY in Vercel.');
 });

@@ -21,25 +21,35 @@ export async function POST(request) {
     }) }] }],
     generationConfig: {
       temperature: 0.2, maxOutputTokens: MAX_OUTPUT_TOKENS,
-      thinkingConfig: { thinkingBudget: 0 },
+      thinkingConfig: { thinkingLevel: 'minimal' },
       responseMimeType: 'application/json',
       responseSchema: { type: 'OBJECT', properties: {
         summary: { type: 'STRING' }, caveat: { type: 'STRING' }, next_step: { type: 'STRING' }
       }, required: ['summary', 'caveat', 'next_step'] }
     }
   };
+  let response;
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.geminiKey },
       body: JSON.stringify(payload), signal: AbortSignal.timeout(7500)
     });
-    if (!response.ok) throw new Error(`Gemini request failed (${response.status}).`);
+  } catch {
+    return json({ error: 'Could not reach Gemini. Try again later.' }, 502);
+  }
+  if (!response.ok) {
+    if (response.status === 404) return json({ error: 'This Gemini model is not available to your API key (HTTP 404). Check the model access in Google AI Studio.' }, 503);
+    if (response.status === 401 || response.status === 403) return json({ error: 'Gemini rejected the API key. Check GEMINI_API_KEY in Vercel.' }, 503);
+    if (response.status === 429) return json({ error: 'Gemini quota was reached. Try again later.' }, 429);
+    return json({ error: 'Gemini returned HTTP ' + response.status + '. Try again later.' }, 502);
+  }
+  try {
     const rawResponse = await response.json();
     const rawText = rawResponse.candidates?.[0]?.content?.parts?.map(p => p.text ?? '').join('') ?? '';
     const answer = safeModelOutput(rawText);
     return json({ figures, answer });
   } catch {
-    return json({ error: 'The AI explanation was unavailable.' }, 502);
+    return json({ error: 'Gemini returned an explanation the site could not read. Try again.' }, 502);
   }
 }

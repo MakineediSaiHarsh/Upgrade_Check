@@ -12,7 +12,7 @@
   const number = n => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
   const year = n => (Math.ceil(n * 10) / 10).toFixed(1);
   const aiLimit = 5;
-  const aiUsageKey = 'upgradecheck_ai_attempts_v2';
+  const aiUsageKey = 'upgradecheck_ai_attempts_v3';
   let inMemoryAttempts = 0;
   function aiAttempts() {
     try {
@@ -393,7 +393,10 @@
     try {
       const response = await fetch('/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'The AI explanation is unavailable.');
+      if (!response.ok) {
+        if (response.status === 503 || response.status === 429) refundAiAttempt();
+        throw new Error(data.error || 'The AI explanation is unavailable.');
+      }
       if (version !== renderVersion) return;
       byId('answer-summary').textContent = data.answer.summary;
       byId('answer-caveat').textContent = data.answer.caveat;

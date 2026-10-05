@@ -37,9 +37,10 @@ function parseCandidates(value) {
 
 function photoError(status) {
   if (status === 401 || status === 403) return { error: 'Gemini rejected the API key. Check GEMINI_API_KEY in Vercel.', status: 503 };
+  if (status === 404) return { error: 'This Gemini model is not available to your API key (HTTP 404). Check the model access in Google AI Studio.', status: 503 };
   if (status === 429) return { error: 'Gemini quota was reached. Try again later.', status: 429 };
   if (status === 400) return { error: 'Gemini rejected the photo request (HTTP 400). Check the image format and API configuration.', status: 502 };
-  return { error: 'Gemini is temporarily unavailable (HTTP ' + status + '). Try again later.', status: 502 };
+  return { error: 'Gemini returned HTTP ' + status + '. Try again later.', status: 502 };
 }
 
 function suggestionFrom(result, details, candidates) {
@@ -80,7 +81,7 @@ export async function POST(request) {
       ] }],
       generationConfig: {
         temperature: 0, maxOutputTokens: MAX_OUTPUT_TOKENS,
-        thinkingConfig: { thinkingBudget: 0 },
+        thinkingConfig: { thinkingLevel: 'minimal' },
         responseMimeType: 'application/json',
         responseSchema: { type: 'OBJECT', properties: {
           brand: { type: 'STRING' }, model: { type: 'STRING' }, type: { type: 'STRING' },

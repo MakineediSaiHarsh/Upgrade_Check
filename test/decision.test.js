@@ -73,8 +73,10 @@ test('AI route uses the Gemini key without any Supabase request',async t=>{
   assert.equal(response.status,200);
   assert.equal(data.figures.annualUnitsSaved,280);
   assert.equal(calls.length,1);
+  assert.match(calls[0].url,/models\/gemini-3\.5-flash-lite:generateContent/);
   assert.equal(calls[0].options.headers['x-goog-api-key'],'test-secret');
   const payload=JSON.parse(calls[0].options.body);
+  assert.deepEqual(payload.generationConfig.thinkingConfig,{thinkingLevel:'minimal'});
   assert.deepEqual(JSON.parse(payload.contents[0].parts[0].text).currentFridge,{name:'Old fridge',type:'other',capacityLitres:null,source:'unknown'});
 });
 
@@ -104,7 +106,9 @@ test('label reading returns reviewable fields without contacting Supabase',async
   assert.equal(data.details.annualUnits,118);
   assert.equal(data.details.type,'direct_cool');
   assert.equal(calls.length,1);
+  assert.match(calls[0].url,/models\/gemini-3\.5-flash-lite:generateContent/);
   assert.equal(calls[0].options.headers['x-goog-api-key'],'test-secret');
+  assert.deepEqual(JSON.parse(calls[0].options.body).generationConfig.thinkingConfig,{thinkingLevel:'minimal'});
   assert.equal(parseLabel(JSON.stringify({brand:'',model:'',type:'',capacity:'',annualUnits:'5 stars'})).annualUnits,null);
   assert.deepEqual(parseLabel(JSON.stringify({brand:'LG',model:'',type:'direct_cool',capacity:'',annualUnits:''})),
     {brand:'LG',model:'',type:'direct_cool',capacity:null,annualUnits:null});
@@ -146,6 +150,13 @@ test('Gemini key and quota failures are distinguishable from an unreadable photo
   const invalid=await POST_LABEL(request());
   assert.equal(invalid.status,503);
   assert.match((await invalid.json()).error,/API key.*Vercel/);
+  globalThis.fetch=async()=>new Response(null,{status:404});
+  const unavailable=await POST_LABEL(request());
+  assert.equal(unavailable.status,503);
+  assert.match((await unavailable.json()).error,/model is not available.*404/);
+  const checkUnavailable=await POST(new Request('https://example.vercel.app/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)}));
+  assert.equal(checkUnavailable.status,503);
+  assert.match((await checkUnavailable.json()).error,/model is not available.*404/);
   globalThis.fetch=async()=>new Response(null,{status:429});
   const quota=await POST_LABEL(request());
   assert.equal(quota.status,429);
