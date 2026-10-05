@@ -1,6 +1,6 @@
 import { SYSTEM_PROMPT, parseInput, compare, safeModelOutput } from '../lib/decision.js';
 import { MODEL, MAX_OUTPUT_TOKENS, config, json, geminiFailure } from '../lib/server.js';
-import { beginGeminiCall, finishGeminiCall, usage } from '../lib/supabase.js';
+import { beginGeminiCall, finishGeminiCall, usage, loggingFailure } from '../lib/supabase.js';
 
 export async function POST(request) {
   if ((request.headers.get('content-length') ?? '0') > 4096) return json({ error: 'Request is too large.' }, 413);
@@ -30,6 +30,7 @@ export async function POST(request) {
     }
   };
   let callId;
+  let loggingWarning;
   try {
     // The free-form concern is sent to Gemini but omitted from the persistent log.
     callId = await beginGeminiCall('result_explanation', {
@@ -38,7 +39,9 @@ export async function POST(request) {
       new_price: input.newPrice, rate_low: input.rateLow, rate_high: input.rateHigh,
       comparison_status: figures.status, has_concern: Boolean(input.concern)
     });
-  } catch { return json({ error: 'AI logging is unavailable. Check the Supabase table and Vercel environment variables.' }, 503); }
+  } catch (error) {
+    loggingWarning = 'AI request was not recorded. ' + loggingFailure(error);
+  }
   let response;
   try {
     response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
@@ -48,13 +51,13 @@ export async function POST(request) {
     });
   } catch {
     await finishGeminiCall(callId, { status: 'transport_error', response_summary: { error: 'Gemini connection failed' } });
-    return json({ error: 'Could not reach Gemini. Try again later.' }, 502);
+    return json({ error: 'Could not reach Gemini. Try again later.', loggingWarning }, 502);
   }
   if (!response.ok) {
     const failure = await geminiFailure(response);
     await finishGeminiCall(callId, { status: 'gemini_error', upstream_status: response.status,
       response_summary: { error: failure.error } });
-    return json({ error: failure.error }, failure.status);
+    return json({ error: failure.error, loggingWarning }, failure.status);
   }
   let rawResponse;
   try {
@@ -63,10 +66,10 @@ export async function POST(request) {
     const answer = safeModelOutput(rawText);
     await finishGeminiCall(callId, { status: 'success', upstream_status: response.status, ...usage(rawResponse),
       response_summary: { answer, comparison_status: figures.status } });
-    return json({ figures, answer });
+    return json({ figures, answer, loggingWarning });
   } catch {
     await finishGeminiCall(callId, { status: 'parse_error', upstream_status: response.status, ...usage(rawResponse),
       response_summary: { error: 'Unreadable model response' } });
-    return json({ error: 'Gemini returned an explanation the site could not read. Try again.' }, 502);
+    return json({ error: 'Gemini returned an explanation the site could not read. Try again.', loggingWarning }, 502);
   }
 }

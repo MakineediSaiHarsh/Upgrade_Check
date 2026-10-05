@@ -32,10 +32,11 @@
     try {
       const response = await fetch('/api/stats', { cache: 'no-store' });
       const data = await response.json();
-      if (!response.ok || !Number.isSafeInteger(data.recordedCalls)) throw new Error('Unavailable');
+      if (!response.ok || !Number.isSafeInteger(data.recordedCalls)) throw new Error(data.error || 'Count unavailable.');
       byId('gemini-call-count').textContent = 'Gemini requests recorded: ' + number(data.recordedCalls);
-    } catch {
-      byId('gemini-call-count').textContent = 'Gemini request count is temporarily unavailable.';
+    } catch (error) {
+      byId('gemini-call-count').textContent = error instanceof TypeError ?
+        'Gemini request count could not be reached.' : error.message;
     }
   }
   function claimAiAttempt() {
@@ -413,14 +414,15 @@
       const data = await response.json();
       if (!response.ok) {
         if (response.status === 503 || response.status === 429) refundAiAttempt();
-        throw new Error(data.error || 'The AI explanation is unavailable.');
+        throw new Error((data.error || 'The AI explanation is unavailable.') + (data.loggingWarning ? ' ' + data.loggingWarning : ''));
       }
       if (version !== renderVersion) return;
       byId('answer-summary').textContent = data.answer.summary;
       byId('answer-caveat').textContent = data.answer.caveat;
       byId('answer-next').textContent = data.answer.next_step;
       byId('ai-answer').hidden = false;
-      message.textContent = 'Explanation ready. The calculation above was done separately.';
+      message.textContent = 'Explanation ready. The calculation above was done separately.' +
+        (data.loggingWarning ? ' ' + data.loggingWarning : '');
     } catch (error) {
       if (version === renderVersion) message.textContent = error.message + ' Your comparison is still available.';
     } finally {
@@ -502,7 +504,7 @@
       }
       if (!response.ok) {
         if (response.status === 503 || response.status === 429) refundAiAttempt();
-        throw new Error(data.error || 'Photo identification is unavailable.');
+        throw new Error((data.error || 'Photo identification is unavailable.') + (data.loggingWarning ? ' ' + data.loggingWarning : ''));
       }
       state[side].photo = data.details;
       const d = data.details;
@@ -548,6 +550,7 @@
           status.textContent = 'Catalogue search is unavailable. Apply visible details or enter your label manually.';
         }
       }
+      if (data.loggingWarning) status.textContent += ' ' + data.loggingWarning;
     } catch (error) {
       status.textContent = error instanceof TypeError ? 'Could not reach the photo service. Try again later or enter details manually.' : error.message;
     } finally { void refreshRecordedCalls(); button.disabled = false; }

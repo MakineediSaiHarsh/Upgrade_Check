@@ -244,16 +244,41 @@ test('model proxy restricts query and never returns the database key',async t=>{
   assert.equal(calledUrl.searchParams.get('brand'),'ilike.*LG*');
 });
 
-test('Gemini is not called if the database cannot create its audit row',async t=>{
+test('a database error does not disable Gemini and clearly marks the request unrecorded',async t=>{
   const oldFetch=globalThis.fetch;const oldEnv={...process.env};
   t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
   process.env.GEMINI_API_KEY='test-secret';
   process.env.SUPABASE_URL='https://example.supabase.co';
   process.env.SUPABASE_SERVICE_KEY='sb_secret_test';
   let calls=0;
-  globalThis.fetch=async url=>{calls++;assert.match(url,/supabase\.co/);return new Response(null,{status:503});};
+  globalThis.fetch=async url=>{
+    calls++;
+    if (String(url).includes('supabase.co')) return new Response(null,{status:503});
+    return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({summary:'Savings scenario',caveat:'Check your labels',next_step:'Compare prices'})}]}}]});
+  };
   const response=await POST(new Request('https://site.test/api/check',{method:'POST',body:JSON.stringify(base)}));
-  assert.equal(response.status,503);
-  assert.match((await response.json()).error,/AI logging is unavailable/);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.match(data.loggingWarning,/not recorded.*HTTP 503/);
+  assert.equal(data.answer.summary,'Savings scenario');
+  assert.equal(calls,2);
+});
+
+test('missing server key yields a specific diagnostic while photo identification works',async t=>{
+  const oldFetch=globalThis.fetch;const oldEnv={...process.env};
+  t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
+  process.env.GEMINI_API_KEY='test-secret';
+  process.env.SUPABASE_URL='https://example.supabase.co';
+  delete process.env.SUPABASE_SERVICE_KEY;
+  let calls=0;
+  globalThis.fetch=async url=>{
+    calls++;
+    assert.match(url,/generativelanguage/);
+    return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({brand:'LG',model:'',type:'direct_cool',capacity:'',annualUnits:''})}]}}]});
+  };
+  const response=await POST_LABEL(new Request('https://site.test/api/label',{method:'POST',
+    body:JSON.stringify({mime:'image/png',side:'old',image:Buffer.from('photo').toString('base64')})}));
+  assert.equal(response.status,200);
+  assert.match((await response.json()).loggingWarning,/Add SUPABASE_SERVICE_KEY.*redeploy/);
   assert.equal(calls,1);
 });

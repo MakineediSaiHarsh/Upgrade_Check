@@ -31,6 +31,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   let failCatalog = false;
   let photoDetails = { brand: 'LG', model: 'GL-B199OSLC', type: 'direct_cool', capacity: null, annualUnits: null };
   let photoFailure = false;
+  let photoLoggingWarning = '';
   let photoCalls = 0;
   let explainCalls = 0;
   const stored = new Map();
@@ -50,7 +51,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
         photoCalls++;
         recordedCalls++;
         return photoFailure ? { ok: false, status: 503, json: async () => ({ error: 'Google denied Gemini API access for this key or project (HTTP 403). Check its status and restrictions in Google AI Studio.' }) } :
-          { ok: true, json: async () => ({ details: photoDetails }) };
+          { ok: true, json: async () => ({ details: photoDetails, loggingWarning: photoLoggingWarning }) };
       }
       if (String(url).includes('/api/check')) {
         explainCalls++;
@@ -214,4 +215,8 @@ test('model-first page calculates locally and handles missing and cross-type mod
   await elements['old-read-label'].listeners.click();
   assert.equal(stored.get('upgradecheck_ai_attempts_v3'), '0');
   assert.equal(elements['old-photo-status'].textContent, 'Google denied Gemini API access for this key or project (HTTP 403). Check its status and restrictions in Google AI Studio.');
+  photoFailure = false;
+  photoLoggingWarning = 'AI request was not recorded. Add SUPABASE_SERVICE_KEY to the calculator Vercel project and redeploy.';
+  await elements['old-read-label'].listeners.click();
+  assert.match(elements['old-photo-status'].textContent, /AI request was not recorded.*SUPABASE_SERVICE_KEY/);
 });
