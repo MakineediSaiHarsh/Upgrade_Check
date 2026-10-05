@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102a32">
+  <meta name="description" content="Name the fridge you have and the fridge you want. Compare their labelled electricity use and see when savings might cover the new fridge's price.">
+  <title>UpgradeCheck — Compare your fridges</title>
+  <style>
+    :root { color-scheme:light; --ink:#102a32; --muted:#456069; --teal:#096d69; --deep:#075956; --cream:#f6f8f5; --line:#cbded9; --mint:#e7f2ef; --amber:#e1ae64; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; color:var(--ink); background:var(--cream); }
+    button,input,textarea { font:inherit; } a { color:inherit; } :focus-visible { outline:3px solid var(--amber); outline-offset:3px; } [hidden] { display:none !important; }
+    .wrap { width:min(1120px,calc(100% - 40px)); margin-inline:auto; }
+    header { background:white; border-bottom:1px solid var(--line); }
+    .head { min-height:68px; display:flex; justify-content:space-between; align-items:center; gap:18px; }
+    .brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; font-size:1.05rem; font-weight:800; letter-spacing:-.035em; }
+    .mark { display:grid; place-items:center; width:33px; height:33px; border-radius:9px; background:var(--teal); color:white; letter-spacing:-.08em; }
+    .head a:last-child { color:var(--teal); font-size:.88rem; font-weight:700; text-decoration:none; }
+    .calculator { padding:36px 0 58px; } .intro { max-width:770px; margin-bottom:24px; }
+    .eyebrow { margin:0 0 9px; color:var(--teal); text-transform:uppercase; letter-spacing:.12em; font-size:.75rem; font-weight:800; }
+    h1 { margin:0 0 12px; font-size:clamp(2.15rem,4.6vw,3.65rem); line-height:1.08; letter-spacing:-.055em; }
+    .intro p:last-child { color:var(--muted); font-size:1.04rem; line-height:1.55; margin:0; }
+    .grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.9fr); align-items:start; gap:22px; }
+    .card { background:white; border:1px solid var(--line); border-radius:20px; box-shadow:0 16px 45px rgba(20,73,70,.06); padding:clamp(20px,3vw,30px); }
+    .card h2 { margin:0 0 18px; font-size:1.35rem; letter-spacing:-.03em; }
+    fieldset { border:0; padding:0; margin:0 0 23px; } legend { font-weight:800; padding:0 0 12px; }
+    .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; }
+    .field { display:block; min-width:0; font-size:.87rem; font-weight:700; }
+    .field input,.field textarea { display:block; width:100%; min-height:46px; margin-top:7px; padding:10px 12px; border:1px solid #aebfbc; border-radius:10px; background:white; color:var(--ink); }
+    .field textarea { min-height:70px; resize:vertical; }
+    .hint,.source { color:var(--muted); font-size:.82rem; line-height:1.5; margin:8px 0 0; }
+    .source { min-height:1.4em; }
+    .sample { border:0; padding:0; background:none; color:var(--teal); font-size:inherit; font-weight:800; cursor:pointer; text-decoration:underline; }
+    .optional { border-top:1px solid var(--line); padding-top:18px; margin:0 0 22px; }
+    .optional summary { color:var(--teal); font-weight:800; cursor:pointer; }
+    .optional-inner { padding-top:18px; }
+    .button { border:0; border-radius:11px; background:var(--teal); color:white; padding:13px 21px; min-height:51px; font-weight:750; cursor:pointer; }
+    .button:hover { background:var(--deep); } .button:disabled { opacity:.65; cursor:wait; }
+    .message { min-height:1.5em; margin:12px 0 0; color:#72531c; line-height:1.5; }
+    .result-card { position:sticky; top:18px; } .result-card > p:first-of-type { color:var(--muted); line-height:1.55; }
+    .result-row { border-top:1px solid var(--line); padding:17px 0; }
+    .result-row span { display:block; color:var(--muted); font-size:.88rem; }
+    .result-row strong { display:block; color:var(--teal); margin-top:4px; font-size:clamp(1.35rem,2.5vw,1.7rem); letter-spacing:-.035em; }
+    .data-note,.answer { background:var(--mint); border-radius:13px; padding:16px 18px; margin:12px 0 18px; line-height:1.5; }
+    .data-note { color:var(--muted); font-size:.83rem; }
+    .answer h3 { margin:0 0 8px; font-size:1rem; } .answer p { margin:8px 0; }
+    .usage { background:#edf7f4; border:1px solid #bfdbd4; border-radius:13px; padding:15px 18px; margin-top:20px; color:var(--muted); }
+    .usage strong { color:var(--teal); font-size:1.32rem; }
+    .details { background:white; border-top:1px solid var(--line); padding:52px 0 60px; }
+    .details h2 { margin:0 0 24px; font-size:clamp(1.55rem,2.6vw,2.2rem); letter-spacing:-.04em; }
+    .detail-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
+    .detail-grid article { border-top:2px solid var(--teal); padding-top:17px; }
+    .detail-grid h3 { font-size:1.03rem; margin:0 0 8px; }
+    .detail-grid p { margin:0; color:var(--muted); line-height:1.6; font-size:.92rem; }
+    .detail-grid a { color:var(--teal); font-weight:700; }
+    footer { background:var(--ink); color:#c9dad6; padding:24px 0; font-size:.82rem; }
+    .foot { display:flex; align-items:center; justify-content:space-between; gap:16px; } .foot p { margin:0; }
+    @media (max-width:850px) { .grid { grid-template-columns:1fr; } .result-card { position:static; } }
+    @media (max-width:640px) { .wrap { width:min(100% - 28px,1120px); } .calculator { padding-top:24px; } .fields,.detail-grid { grid-template-columns:1fr; } .detail-grid { gap:25px; } .foot { align-items:start; flex-direction:column; } }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+    .compare-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; align-items:stretch; }
+    .compare-card { min-width:0; } .compare-card h2 { margin-bottom:5px; }
+    .step { display:inline-flex; align-items:center; justify-content:center; width:29px; height:29px; border-radius:9px; background:var(--mint); color:var(--deep); margin-right:6px; font-size:.92rem; }
+    .card-intro { margin:0 0 19px; color:var(--muted); line-height:1.5; font-size:.93rem; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+    .form-grid .wide { grid-column:1 / -1; }
+    .field select { display:block; width:100%; min-height:46px; margin-top:7px; padding:10px 12px; border:1px solid #aebfbc; border-radius:10px; background:white; color:var(--ink); }
+    .field input:focus,.field select:focus,.field textarea:focus { border-color:var(--teal); outline:2px solid #9ccdc5; outline-offset:1px; }
+    .source-line { min-height:2.4em; margin:11px 0 2px; color:var(--muted); font-size:.81rem; line-height:1.45; }
+    .source-line strong { color:var(--teal); }
+    .label-help { color:var(--muted); font-size:.82rem; line-height:1.5; margin:5px 0 0; }
+    .label-box { margin-top:14px; border-top:1px solid var(--line); padding-top:14px; }
+    .label-box summary { cursor:pointer; color:var(--teal); font-size:.85rem; font-weight:750; }
+    .label-box .field { margin:12px 0 9px; }
+    .label-box input[type=file] { min-height:unset; padding:9px; }
+    .subtle-button { background:white; color:var(--teal); border:1px solid var(--teal); padding:9px 13px; border-radius:9px; font-weight:750; cursor:pointer; }
+    .subtle-button:hover { background:var(--mint); }
+    .small-status { display:block; color:var(--muted); font-size:.8rem; line-height:1.45; margin-top:8px; }
+    .purchase { background:var(--mint); border-radius:13px; margin-top:17px; padding:14px; }
+    .purchase p { margin:9px 0 0; font-size:.83rem; color:var(--muted); line-height:1.5; }
+    .adjustments { margin:18px 0 22px; padding:0 3px; }
+    .adjustments summary { cursor:pointer; font-weight:750; color:var(--teal); }
+    .adjustments .form-grid { margin-top:17px; grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .result-card { position:static; margin-top:19px; }
+    .result-header { display:flex; justify-content:space-between; align-items:flex-start; gap:15px; flex-wrap:wrap; }
+    .result-header h2 { margin-bottom:3px; }
+    .result-headline { color:var(--teal); font-size:clamp(1.7rem,3vw,2.55rem); font-weight:850; line-height:1.12; letter-spacing:-.05em; margin:18px 0 10px; }
+    .result-detail { max-width:780px; line-height:1.55; margin:0 0 15px; }
+    .metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:17px 0; }
+    .metric { background:var(--cream); border:1px solid var(--line); border-radius:13px; padding:15px; }
+    .metric span { display:block; font-size:.82rem; color:var(--muted); }
+    .metric strong { display:block; color:var(--ink); margin-top:7px; font-size:1.13rem; line-height:1.25; }
+    .data-note { margin:15px 0 0; }
+    .result-actions { display:flex; gap:11px; flex-wrap:wrap; align-items:center; margin-top:18px; }
+    .threshold { border-left:3px solid var(--amber); background:#fff8eb; border-radius:6px 12px 12px 6px; padding:12px 14px; line-height:1.55; }
+    .muted-text { color:var(--muted); font-size:.84rem; line-height:1.55; }
+    .usage { margin-top:17px; }
+    @media (max-width:760px) { .compare-grid,.metrics { grid-template-columns:1fr; } .adjustments .form-grid { grid-template-columns:1fr 1fr; } }
+    @media (max-width:480px) { .adjustments .form-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header><div class="wrap head"><a class="brand" href="../index.html"><span class="mark" aria-hidden="true">uc</span>UpgradeCheck</a><a href="../index.html">Home</a></div></header>
+  <main id="top">
+    <section class="calculator" aria-labelledby="title"><div class="wrap">
+      <div class="intro"><p class="eyebrow">Fridge electricity payback</p><h1 id="title">Will the fridge you want pay for itself?</h1><p>Name the fridge you use now and the specific one you want. See whether lower electricity use could recover its purchase price. <button class="sample" id="try-sample" type="button">Try a filled example</button></p></div>
+      <form id="check-form" novalidate>
+        <div class="compare-grid">
+          <section class="card compare-card" aria-labelledby="old-title">
+            <h2 id="old-title"><span class="step">1</span> My current fridge</h2>
+            <p class="card-intro">Look for the model number on its label or inside the door. An approximate name is okay if the model is missing from our search.</p>
+            <div class="form-grid">
+              <label class="field">Type<select id="old-type" name="oldType"><option value="">Choose type</option><option value="direct_cool">Direct Cool</option><option value="frost_free">Frost Free</option><option value="side_by_side">Side by Side</option><option value="multi_door">Multi Door</option><option value="other">Other / not sure</option></select></label>
+              <label class="field">Brand<input id="old-brand" name="oldBrand" list="brand-options" maxlength="60" placeholder="e.g. LG" autocomplete="off"></label>
+              <label class="field wide">Model number<input id="old-model" name="oldModel" list="old-model-options" maxlength="80" placeholder="e.g. GL-B199OSLC; leave blank if unknown" autocomplete="off"></label>
+              <label class="field">Capacity (litres, optional)<input id="old-capacity" name="oldCapacity" type="number" min="30" max="1500" step="1" placeholder="e.g. 185"></label>
+              <label class="field">Labelled annual units (kWh/year)<input id="old-units" name="oldUnits" type="number" min="1" max="5000" step="any" placeholder="Auto-filled for matches"></label>
+            </div>
+            <p class="source-line" id="old-source">Choose a type, then search by brand or model. If your fridge is missing, enter its label’s annual units.</p>
+            <p class="label-help">If the model is not listed, enter its label's annual units. Do not use the star count as the annual units.</p>
+            <details class="label-box"><summary>Have a label photo? Read it with Gemini</summary>
+              <label class="field">Photo of the energy label (JPG, PNG or WebP; up to 2 MB)<input id="old-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+              <button class="subtle-button" id="old-read-label" type="button">Extract details for my review</button>
+              <span class="small-status" id="old-photo-status" role="status"></span>
+              <div class="data-note" id="old-photo-review" hidden><p id="old-photo-preview"></p><button class="subtle-button" id="old-use-photo" type="button">Use these details</button> <button class="sample" id="old-dismiss-photo" type="button">Dismiss</button></div>
+            </details>
+            <label class="field" style="margin-top:16px;font-weight:600"><input id="current-unusable" type="checkbox" style="display:inline;width:auto;min-height:unset;margin:0 7px 0 0;vertical-align:middle">I have to replace this fridge; keeping it is not an option</label>
+          </section>
+          <section class="card compare-card" aria-labelledby="new-title">
+            <h2 id="new-title"><span class="step">2</span> The fridge I want</h2>
+            <p class="card-intro">Choose any size or type. A larger Frost Free model can be compared with a smaller Direct Cool fridge.</p>
+            <div class="form-grid">
+              <label class="field">Type<select id="new-type" name="newType"><option value="">Choose type</option><option value="direct_cool">Direct Cool</option><option value="frost_free">Frost Free</option><option value="side_by_side">Side by Side</option><option value="multi_door">Multi Door</option><option value="other">Other / not sure</option></select></label>
+              <label class="field">Brand<input id="new-brand" name="newBrand" list="brand-options" maxlength="60" placeholder="e.g. Samsung" autocomplete="off"></label>
+              <label class="field wide">Model number<input id="new-model" name="newModel" list="new-model-options" maxlength="80" placeholder="Search the exact model you want" autocomplete="off"></label>
+              <label class="field">Capacity (litres, optional)<input id="new-capacity" name="newCapacity" type="number" min="30" max="1500" step="1" placeholder="e.g. 260"></label>
+              <label class="field">Labelled annual units (kWh/year)<input id="new-units" name="newUnits" type="number" min="1" max="5000" step="any" placeholder="Auto-filled for matches"></label>
+            </div>
+            <p class="source-line" id="new-source">Choose an exact model suggestion when available, or enter its label's annual units.</p>
+            <details class="label-box"><summary>Have a label photo? Read it with Gemini</summary>
+              <label class="field">Photo of the energy label (JPG, PNG or WebP; up to 2 MB)<input id="new-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+              <button class="subtle-button" id="new-read-label" type="button">Extract details for my review</button>
+              <span class="small-status" id="new-photo-status" role="status"></span>
+              <div class="data-note" id="new-photo-review" hidden><p id="new-photo-preview"></p><button class="subtle-button" id="new-use-photo" type="button">Use these details</button> <button class="sample" id="new-dismiss-photo" type="button">Dismiss</button></div>
+            </details>
+            <div class="purchase">
+              <label class="field">Checkout price for this fridge (₹)<input id="new-price" name="newPrice" type="number" min="1" max="1000000" step="any" placeholder="Enter the price you would pay"></label>
+              <p>Model data does not include a reliable shop price. Leave this blank to compare annual electricity use; add it to see payback years.</p>
+            </div>
+          </section>
+        </div>
+        <datalist id="brand-options"></datalist><datalist id="old-model-options"></datalist><datalist id="new-model-options"></datalist>
+        <details class="adjustments"><summary>Adjust electricity rate, trade-in or ask Gemini a question</summary>
+          <div class="form-grid">
+            <label class="field">Lower electricity price (₹/unit)<input id="rate-low" name="rateLow" type="number" min="0.1" max="100" step="any" value="7"></label>
+            <label class="field">Higher electricity price (₹/unit)<input id="rate-high" name="rateHigh" type="number" min="0.1" max="100" step="any" value="10"></label>
+            <label class="field">Trade-in or resale amount (₹)<input id="trade-in" name="tradeIn" type="number" min="0" max="1000000" step="any" value="0"></label>
+            <label class="field wide">Optional question for Gemini<textarea id="concern" name="concern" maxlength="180" placeholder="What else should I consider?"></textarea></label>
+          </div>
+          <p class="hint">₹7–10/unit is an illustrative range. Edit it for your situation; the tool does not calculate DISCOM billing slabs.</p>
+        </details>
+      </form>
+      <section class="card result-card" aria-labelledby="result-title" aria-live="polite">
+        <div class="result-header"><div><p class="eyebrow">Your comparison</p><h2 id="result-title">Electricity payback</h2></div><button id="copy-result" class="subtle-button" type="button" hidden>Copy result</button></div>
+        <p id="result-headline" class="result-headline">Start with your two fridges</p>
+        <p id="result-detail" class="result-detail">Choose their types, enter the brands and models you know, then confirm their labelled annual units. The result updates here as you go.</p>
+        <p id="form-message" class="message" role="status" hidden></p>
+        <div id="result-content" hidden>
+          <div class="metrics">
+            <div class="metric"><span>Labelled annual use difference</span><strong id="units-result"></strong></div>
+            <div class="metric"><span>Annual bill difference</span><strong id="saving-result"></strong></div>
+            <div class="metric"><span>At five years</span><strong id="milestone-result"></strong></div>
+          </div>
+          <p id="threshold-result" class="threshold" hidden></p>
+          <p id="data-note" class="data-note"></p>
+          <p id="result-basis" class="muted-text"></p>
+          <div class="result-actions"><button id="explain-button" class="button" type="button" disabled>Explain with Gemini</button><span class="muted-text">Optional; the numbers above work without AI.</span></div>
+          <p id="ai-message" class="message" role="status"></p>
+          <div id="ai-answer" class="answer" hidden><h3>Gemini's explanation</h3><p id="answer-summary"></p><p id="answer-caveat"></p><p id="answer-next"></p></div>
+        </div>
+        <div class="usage"><strong id="usage-total">—</strong><span> AI assists saved so far</span><p class="hint">Label photo extraction and explanations share a five-attempt limit per browser. The calculator has no limit.</p></div>
+      </section>
+    </div></section>
+    <section class="details" id="how-it-works" aria-labelledby="details-title"><div class="wrap">
+      <h2 id="details-title">How to read your result</h2><div class="detail-grid">
+        <article><h3>Break-even from electricity</h3><p>Annual units saved = current label units − desired model label units. Divide net checkout price by the annual bill saving. If your current fridge must be replaced, compare running costs instead of treating this as a keep-versus-upgrade payback.</p></article>
+        <article><h3>Our model search</h3><p>Searches our Supabase refrigerator catalogue as you type. Coverage depends on the models added to the database, so a missing match is not evidence that a fridge is unavailable. Check every annual-unit figure against the exact label; provisional entries may need correction. <a href="https://beestarlabel.com/searchcompare" target="_blank" rel="noopener noreferrer">Check the BEE source</a>.</p></article>
+        <article><h3>Why it is a scenario</h3><p>Labels are standard-test values, not measurements of an ageing fridge at home. Electricity prices and purchase prices vary. Capacity, features, repair needs and warranty also matter. A long or impossible electricity payback can still be a useful answer.</p></article>
+      </div>
+    </div></section>
+  </main>
+  <footer><div class="wrap foot"><p>UpgradeCheck · Refrigerator comparison</p><p>Independent tool. Not affiliated with or endorsed by BEE.</p></div></footer>
+  <script src="catalog.js"></script>
+  <script src="payback.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

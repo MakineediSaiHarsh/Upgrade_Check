@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102a32">
+  <meta name="description" content="Compare the fridge you own with the one you want. See when labelled electricity savings could recover the purchase price.">
+  <title>UpgradeCheck — Compare your fridge upgrade</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #102a32;
+      --ink-soft: #3e5860;
+      --teal: #096d69;
+      --teal-dark: #075956;
+      --cream: #f7f8f4;
+      --paper: #fff;
+      --line: #d8e3e1;
+      --amber: #e1ae64;
+      --shadow: 0 28px 70px rgba(9, 43, 49, .12);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--ink); background: var(--cream); }
+    a { color: inherit; }
+    a:focus-visible { outline: 3px solid var(--amber); outline-offset: 4px; }
+    .wrap { width: min(1180px, calc(100% - 48px)); margin-inline: auto; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: .74rem; font-weight: 800; color: var(--teal); }
+    .site-header { background: var(--cream); border-bottom: 1px solid var(--line); }
+    .header-inner { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; font-size: 1.08rem; font-weight: 800; letter-spacing: -.035em; }
+    .brand-mark { width: 35px; height: 35px; border-radius: 10px; background: var(--teal); display: grid; place-items: center; color: white; font-weight: 800; letter-spacing: -.08em; }
+    .nav { display: flex; align-items: center; gap: 30px; }
+    .nav a { text-decoration: none; color: var(--ink-soft); font-size: .9rem; font-weight: 650; }
+    .nav a:hover { color: var(--teal); }
+    .nav .nav-cta { border: 1px solid var(--ink); border-radius: 999px; padding: 11px 18px; color: var(--ink); }
+    .nav .nav-cta:hover { background: var(--ink); color: white; }
+    .hero { padding: 62px 0 86px; overflow: hidden; }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(0, .98fr); gap: clamp(30px, 4vw, 64px); align-items: center; }
+    .hero-copy { padding: 24px 0; }
+    .hero h1 { max-width: 690px; font-size: clamp(2.85rem, 5.25vw, 5rem); line-height: 1.055; letter-spacing: -.065em; margin: 17px 0 26px; }
+    .hero h1 em { font-style: normal; color: var(--teal); }
+    .hero-lead { max-width: 570px; color: var(--ink-soft); font-size: clamp(1.06rem, 1.45vw, 1.28rem); line-height: 1.6; margin: 0 0 30px; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 12px 23px; border-radius: 11px; text-decoration: none; font-weight: 750; border: 1px solid transparent; transition: transform .18s, background .18s, box-shadow .18s; }
+    .button:hover { transform: translateY(-2px); }
+    .button-primary { background: var(--teal); color: white; box-shadow: 0 10px 24px rgba(9, 109, 105, .18); }
+    .button-primary:hover { background: var(--teal-dark); }
+    .button-secondary { background: transparent; border-color: #aabdb9; color: var(--ink); }
+    .button-secondary:hover { background: white; }
+    .hero-note { margin: 23px 0 0; color: #5c7478; font-size: .88rem; }
+    .hero-visual { position: relative; min-width: 0; padding-bottom: 26px; }
+    .hero-photo { display: block; width: 100%; aspect-ratio: 4 / 4.45; object-fit: cover; object-position: 52% center; border-radius: 26px; box-shadow: var(--shadow); }
+    .photo-credit { position: absolute; right: 18px; top: 16px; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,.9); font-size: .75rem; font-weight: 700; }
+    .decision-card { position: absolute; bottom: 0; left: -38px; width: min(360px, 78%); background: white; padding: 22px 24px; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 20px 55px rgba(16,42,50,.16); }
+    .decision-card .small { font-size: .76rem; text-transform: uppercase; letter-spacing: .12em; color: #627d7e; font-weight: 800; margin: 0 0 13px; }
+    .decision-card dl { margin: 0; }
+    .decision-card dl div { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid #e8eeec; }
+    .decision-card dt { color: var(--ink-soft); font-size: .92rem; }
+    .decision-card dd { margin: 0; font-size: .98rem; font-weight: 800; }
+    .decision-card .gap dd { color: var(--teal); }
+    .section { padding: 88px 0; }
+    .section-head { max-width: 720px; }
+    h2 { font-size: clamp(2.15rem, 3.3vw, 3.4rem); line-height: 1.12; letter-spacing: -.05em; margin: 14px 0 18px; }
+    .section-intro { color: var(--ink-soft); font-size: 1.08rem; line-height: 1.65; margin: 0; }
+    .story { background: var(--ink); color: #edf8f5; }
+    .story .eyebrow { color: #9fe0d8; }
+    .story h2 { max-width: 800px; }
+    .story-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 38px; }
+    .story-card { min-height: 215px; padding: 26px; border: 1px solid rgba(234,255,250,.19); background: rgba(255,255,255,.055); border-radius: 18px; }
+    .story-card .number { display: block; color: #9fe0d8; font-weight: 800; letter-spacing: .09em; font-size: .83rem; margin-bottom: 24px; }
+    .story-card h3 { font-size: 1.22rem; letter-spacing: -.025em; margin: 0 0 11px; }
+    .story-card p { color: #bfd2d0; line-height: 1.55; margin: 0; font-size: .96rem; }
+    .example { background: #e8f2ef; scroll-margin-top: 24px; }
+    .example-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: clamp(30px, 6vw, 85px); align-items: center; }
+    .example-copy p { color: var(--ink-soft); line-height: 1.65; font-size: 1.05rem; }
+    .example-card { background: var(--paper); border: 1px solid #cbded9; border-radius: 22px; padding: clamp(24px, 3vw, 38px); box-shadow: 0 16px 45px rgba(20,73,70,.065); }
+    .example-card .tag { display: inline-block; color: var(--teal); font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .example-card h3 { font-size: 1.5rem; letter-spacing: -.035em; margin: 9px 0 20px; }
+    .example-row { display: flex; justify-content: space-between; gap: 20px; padding: 14px 0; border-top: 1px solid var(--line); }
+    .example-row span { color: var(--ink-soft); }
+    .example-row strong { white-space: nowrap; }
+    .example-result { background: #e7f2ef; border-radius: 14px; padding: 20px; margin-top: 18px; }
+    .example-result span { display: block; font-size: .88rem; color: var(--ink-soft); font-weight: 750; }
+    .example-result strong { display: block; font-size: clamp(1.65rem, 2.5vw, 2.35rem); letter-spacing: -.045em; color: var(--teal); margin: 4px 0; }
+    .example-result p, .example-card .footnote { color: var(--ink-soft); line-height: 1.55; font-size: .86rem; margin: 0; }
+    .example-card .footnote { margin-top: 15px; }
+    .roadmap { background: var(--paper); }
+    .roadmap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 36px; }
+    .roadmap-card { border: 1px solid var(--line); border-radius: 18px; padding: 28px; }
+    .roadmap-card.current { background: #e8f2ef; border-color: #bfdbd4; }
+    .roadmap-card .stage { color: var(--teal); font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
+    .roadmap-card h3 { font-size: 1.4rem; margin: 14px 0 11px; letter-spacing: -.035em; }
+    .roadmap-card p { color: var(--ink-soft); margin: 0; line-height: 1.62; }
+    .trust { background: var(--cream); }
+    .trust-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: clamp(30px, 6vw, 100px); align-items: start; }
+    .trust-list { display: grid; gap: 17px; }
+    .trust-item { padding: 21px 0; border-top: 1px solid var(--line); }
+    .trust-item h3 { font-size: 1.14rem; letter-spacing: -.025em; margin: 0 0 7px; }
+    .trust-item p { color: var(--ink-soft); line-height: 1.6; margin: 0; }
+    .trust-item a { color: var(--teal); font-weight: 700; }
+    .closing { padding: 88px 0 94px; background: #d7eae6; }
+    .closing-inner { display: flex; align-items: end; justify-content: space-between; gap: 26px; }
+    .closing h2 { max-width: 720px; margin-bottom: 0; }
+    .closing .button { flex: 0 0 auto; }
+    .footer { background: var(--ink); color: #c2d6d2; padding: 27px 0; }
+    .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 18px; font-size: .82rem; }
+    .footer p { margin: 0; }
+    @media (max-width: 960px) {
+      .hero-grid, .example-grid { grid-template-columns: 1fr; }
+      .hero-copy { padding: 0; }
+      .hero-visual { max-width: 650px; margin: 0 auto; width: 100%; }
+      .hero-photo { aspect-ratio: 1.35; }
+      .decision-card { left: -12px; }
+      .trust-grid { grid-template-columns: 1fr; gap: 20px; }
+    }
+    @media (max-width: 680px) {
+      .wrap { width: min(100% - 32px, 1180px); }
+      .header-inner { min-height: 68px; }
+      .nav a:not(.nav-cta) { display: none; }
+      .nav .nav-cta { padding: 9px 12px; font-size: .78rem; }
+      .brand { font-size: .97rem; }
+      .brand-mark { width: 32px; height: 32px; }
+      .hero { padding: 43px 0 68px; }
+      .hero h1 { font-size: clamp(2.5rem, 11vw, 3.6rem); }
+      .hero-photo { aspect-ratio: 1.1; }
+      .decision-card { left: 8px; bottom: 0; width: min(330px, calc(100% - 30px)); padding: 18px; }
+      .section { padding: 64px 0; }
+      .story-grid, .roadmap-grid { grid-template-columns: 1fr; gap: 10px; }
+      .story-card { min-height: 0; }
+      .story-card .number { margin-bottom: 13px; }
+      .example-card { padding: 21px; }
+      .closing { padding: 65px 0; }
+      .closing-inner { align-items: start; flex-direction: column; }
+      .footer-inner { align-items: start; flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .button { transition: none; } }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="#top" aria-label="UpgradeCheck, back to top"><span class="brand-mark" aria-hidden="true">uc</span><span>UpgradeCheck</span></a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="#how-it-works">How it works</a>
+        <a href="#categories">The roadmap</a>
+        <a class="nav-cta" href="calculator/index.html">Open calculator</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">Your fridge upgrade, with the costs in view</span>
+          <h1 id="hero-title">A new fridge catches your eye. <em>When could it pay for itself?</em></h1>
+          <p class="hero-lead">Name the fridge you have and the one you want, even if it is larger or a different type. Compare their labelled electricity use and see how long the saving could take to cover its price.</p>
+          <div class="actions">
+            <a class="button button-primary" href="calculator/index.html">Compare my fridges</a>
+            <a class="button button-secondary" href="#example">See an example</a>
+          </div>
+          <p class="hero-note">The fridge calculator is available now. No account or AI call is needed for the numbers.</p>
+        </div>
+        <div class="hero-visual">
+          <img class="hero-photo" src="assets/repair-or-upgrade-editorial.png" alt="A person in a kitchen considers an open refrigerator" width="1664" height="936">
+          <span class="photo-credit">Illustrative scene</span>
+          <div class="decision-card" aria-label="Illustrative electricity label comparison">
+            <p class="small">The labels, at a glance</p>
+            <dl>
+              <div><dt>Current fridge</dt><dd>190 units/year</dd></div>
+              <div><dt>Desired fridge</dt><dd>118 units/year</dd></div>
+              <div class="gap"><dt>Label difference</dt><dd>72 units/year</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section story" id="how-it-works" aria-labelledby="story-title">
+      <div class="wrap">
+        <span class="eyebrow">The problem</span>
+        <h2 id="story-title">A star rating alone cannot answer your upgrade question.</h2>
+        <p class="section-intro" style="color:#bfd2d0;max-width:780px">The fridge you want may have a different size or type. UpgradeCheck starts with both specific models, then shows what their annual label figures imply for your electricity bill and the purchase price.</p>
+        <div class="story-grid">
+          <article class="story-card"><span class="number">01 / YOUR TWO FRIDGES</span><h3>Name the models</h3><p>Enter the type, brand and model for the fridge you own and the one you are considering.</p></article>
+          <article class="story-card"><span class="number">02 / THE LABELS</span><h3>Compare annual units</h3><p>Search our refrigerator catalogue for each model, then check its standard-test electricity figure against the label. You can also enter it manually.</p></article>
+          <article class="story-card"><span class="number">03 / THE PAYBACK</span><h3>See the time to break even</h3><p>Add the checkout price to see when estimated electricity savings could cover it.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section example" id="example" aria-labelledby="example-title">
+      <div class="wrap example-grid">
+        <div class="example-copy">
+          <span class="eyebrow">An example you can try</span>
+          <h2 id="example-title">Lower bills do not always mean a quick payback.</h2>
+          <p>Suppose your current fridge’s label lists 190 units a year, and the fridge you want lists 118. At ₹7–10 per unit, the 72-unit difference is about ₹504–₹720 a year.</p>
+          <p>If the new fridge costs ₹25,000, electricity savings alone would take decades to cover it. Capacity, features and the condition of your current fridge may still matter.</p>
+          <a class="button button-primary" href="calculator/index.html">Try the calculator</a>
+        </div>
+        <div class="example-card" aria-label="Illustrative fridge electricity payback">
+          <span class="tag">Illustrative numbers</span>
+          <h3>Current versus desired fridge</h3>
+          <div class="example-row"><span>Current label</span><strong>190 units/year</strong></div>
+          <div class="example-row"><span>Desired label</span><strong>118 units/year</strong></div>
+          <div class="example-row"><span>Checkout price</span><strong>₹25,000</strong></div>
+          <div class="example-row"><span>Electricity price range</span><strong>₹7–10/unit</strong></div>
+          <div class="example-result">
+            <span>Estimated electricity payback</span>
+            <strong>34.8–49.7 years</strong>
+            <p>₹25,000 divided by an illustrative annual electricity saving of ₹720–₹504.</p>
+          </div>
+          <p class="footnote">Label figures are standard-test values, not a measurement of an ageing fridge at home. Actual savings and payback may differ.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section roadmap" id="categories" aria-labelledby="roadmap-title">
+      <div class="wrap">
+        <div class="section-head"><span class="eyebrow">One decision, different appliances</span><h2 id="roadmap-title">Start focused. Expand with the right maths.</h2><p class="section-intro">Each appliance has different label data and usage patterns, so any future calculator needs its own inputs and method.</p></div>
+        <div class="roadmap-grid">
+          <article class="roadmap-card current"><span class="stage">Available now</span><h3>Refrigerators</h3><p>Compare the fridge you own with the one you want. Use annual label units for payback or see a five-year threshold when the old label is missing.</p></article>
+          <article class="roadmap-card"><span class="stage">Possible next check</span><h3>Air conditioners</h3><p>Any future AC comparison would need efficiency information and expected hours of use. This check is not available yet.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section trust" id="what-we-know" aria-labelledby="trust-title">
+      <div class="wrap trust-grid">
+        <div><span class="eyebrow">Built for an honest answer</span><h2 id="trust-title">Show the trade-offs. Leave the guesses out.</h2><p class="section-intro">The calculator compares electricity scenarios. Capacity, convenience, warranty and the condition of your fridge remain part of your decision.</p></div>
+        <div class="trust-list">
+          <div class="trust-item"><h3>Labels are a starting point</h3><p>BEE label values come from standard tests. Actual use varies by appliance, condition and household. <a href="https://beeindia.gov.in/show_content.php?lang=1&amp;level=1&amp;lid=322&amp;ls_id=198" target="_blank" rel="noopener noreferrer">See BEE’s labelling programme</a>.</p></div>
+          <div class="trust-item"><h3>No invented old-appliance reading</h3><p>If a label is gone, a break-even target can still help. Age or star rating alone cannot establish how much electricity that individual appliance uses now.</p></div>
+          <div class="trust-item"><h3>Your electricity price</h3><p>Edit the illustrative rate range to explore how your bill assumptions affect the result. The calculator does not compute local DISCOM slabs.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing" aria-labelledby="closing-title">
+      <div class="wrap closing-inner"><div><span class="eyebrow">A clearer choice starts here</span><h2 id="closing-title">Bring the fridge you have and the one you want. See what their labels can tell you.</h2></div><a class="button button-primary" href="calculator/index.html">Compare my fridges</a></div>
+    </section>
+  </main>
+  <footer class="footer"><div class="wrap footer-inner"><p>UpgradeCheck · Refrigerator comparison</p><p>Independent tool. Not affiliated with or endorsed by BEE.</p></div></footer>
+</body>
+</html>
