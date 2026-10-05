@@ -6,11 +6,32 @@
   const typeNames = { direct_cool: 'Direct Cool', frost_free: 'Frost Free', side_by_side: 'Side by Side', multi_door: 'Multi Door', other: 'Other / not sure' };
   const state = {
     old: { selected: null, origin: null, photo: null },
-    new: { selected: null, origin: null, photo: null }
+    new: { selected: null, origin: null, photo: null, samplePrice: false }
   };
   const currency = n => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
   const number = n => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
   const year = n => (Math.ceil(n * 10) / 10).toFixed(1);
+  const aiLimit = 5;
+  const aiUsageKey = 'upgradecheck_ai_attempts_v1';
+  let inMemoryAttempts = 0;
+  function aiAttempts() {
+    try {
+      const value = Number.parseInt(localStorage.getItem(aiUsageKey), 10);
+      return Number.isInteger(value) && value >= 0 ? Math.min(aiLimit, value) : 0;
+    } catch { return inMemoryAttempts; }
+  }
+  function updateAiUsage() {
+    const remaining = aiLimit - aiAttempts();
+    byId('ai-remaining').textContent = remaining + ' of ' + aiLimit + ' AI attempts remaining on this browser.';
+  }
+  function claimAiAttempt() {
+    const used = aiAttempts();
+    if (used >= aiLimit) { updateAiUsage(); return false; }
+    inMemoryAttempts = used + 1;
+    try { localStorage.setItem(aiUsageKey, String(inMemoryAttempts)); } catch { /* Keep a page-only count when storage is disabled. */ }
+    updateAiUsage();
+    return true;
+  }
   const norm = value => String(value || '').trim().toLocaleLowerCase('en-IN').replace(/\s+/g, ' ');
   const field = (side, name) => byId(side + '-' + name);
   let currentInput = null;
@@ -18,6 +39,14 @@
   const searchVersions = { old: 0, new: 0 };
   const searchTimers = { old: null, new: null };
   const brands = new Set();
+  function showIdentified(side) {
+    const name = [field(side, 'brand').value.trim(), field(side, 'model').value.trim()].filter(Boolean).join(' ');
+    const type = typeNames[field(side, 'type').value] || '';
+    const units = field(side, 'units').value.trim();
+    field(side, 'identified').textContent = name || type || units ?
+      'Details: ' + [name || 'Brand/model unknown', type, units ? units + ' units/year' : 'annual units unknown'].filter(Boolean).join(' · ') :
+      'No fridge details applied yet.';
+  }
 
   const brandOptions = byId('brand-options');
   function addBrands(rows) {
@@ -42,8 +71,10 @@
   }
 
   function clearUnits(side) {
+    if (side === 'new' && state.new.samplePrice) byId('new-price').value = '';
+    if (side === 'new') state.new.samplePrice = false;
     field(side, 'units').value = '';
-    if (state[side].selected) field(side, 'capacity').value = '';
+    field(side, 'capacity').value = '';
     state[side].selected = null;
     state[side].origin = null;
     field(side, 'source').textContent = 'Search by model number, or enter the annual units from its label.';
@@ -182,7 +213,7 @@
     return null;
   }
   function sourceName(origin) {
-    return origin === 'catalog' ? 'refrigerator catalogue, check exact BEE label' : origin === 'photo' ? 'photo extraction confirmed by you' : origin === 'label' ? 'annual units entered by you' : 'annual units missing';
+    return origin === 'catalog' ? 'refrigerator catalogue, check exact BEE label' : origin === 'photo' ? 'photo extraction confirmed by you' : origin === 'label' ? 'annual units entered by you' : origin === 'example' ? 'illustrative example figures' : 'annual units missing';
   }
   function moneyRange(values) {
     const amounts = values.map(Math.abs).sort((a, b) => a - b).map(currency);
@@ -194,10 +225,12 @@
     return 'UpgradeCheck: ' + oldName + ' → ' + newName + '\n' +
       byId('result-headline').textContent + '. ' + byId('result-detail').textContent + '\n' +
       (result.annualUnitsSaved == null ? 'Annual use comparison needs both labels.' : 'Annual units saved: ' + number(result.annualUnitsSaved) + '.') +
-      '\nLabel-based scenario; actual use may differ.';
+      (input.oldSource === 'example' || input.newSource === 'example' ? '\nIllustrative example; replace every figure with your own.' : '\nLabel-based scenario; actual use may differ.');
   }
   function render() {
     renderVersion++;
+    showIdentified('old');
+    showIdentified('new');
     currentInput = null;
     byId('ai-answer').hidden = true;
     byId('ai-message').textContent = '';
@@ -212,7 +245,7 @@
     message.hidden = true;
     if (!completeNames) {
       headline.textContent = 'Start with your two fridges';
-      detail.textContent = 'Choose the type and enter the brand for each fridge. Search the model number if you know it; other fridges can use their label’s annual units.';
+      detail.textContent = 'Upload a photo of each fridge and apply the details Gemini can identify. You can review or enter missing details in either fridge card.';
       return;
     }
     const error = validate(input);
@@ -267,8 +300,10 @@
         (slow > 15 ? ' This is a long payback from electricity alone.' : '');
     }
     byId('data-note').textContent = 'Figures: ' + input.oldModel + ' — ' + sourceName(input.oldSource) + '; ' +
-      input.newModel + ' — ' + sourceName(input.newSource) + '. Each fridge’s type and capacity are shown in its card.';
-    byId('result-basis').textContent = 'This is a label-based electricity scenario. Standard-test figures do not measure your ageing fridge today. Prices, tariffs and future use may differ; it is not guaranteed profit.';
+      input.newModel + ' — ' + sourceName(input.newSource) + '. Review each fridge’s details in its card.';
+    byId('result-basis').textContent = input.oldSource === 'example' || input.newSource === 'example' ?
+      'Illustrative example only. Replace both fridges, annual units, checkout price and electricity rate with your own details before deciding.' :
+      'This is a label-based electricity scenario. Standard-test figures do not measure your ageing fridge today. Prices, tariffs and future use may differ; it is not guaranteed profit.';
     byId('explain-button').disabled = input.newUnits == null || (input.oldUnits == null && result.fiveYearOldUnits == null);
     byId('copy-result').onclick = async () => {
       try {
@@ -291,35 +326,47 @@
     if (event.target.id === 'current-unusable') render();
   });
   form.addEventListener('submit', event => event.preventDefault());
-  byId('try-sample').addEventListener('click', async () => {
-    for (const [side, model] of [['old', 'GL-B199OSLC'], ['new', 'GLD235']]) {
+  byId('try-sample').addEventListener('click', () => {
+    const examples = {
+      old: { model: 'Current 190 L', capacity: 190, units: 360 },
+      new: { model: 'New 220 L', capacity: 220, units: 160 }
+    };
+    for (const side of ['old', 'new']) {
       invalidateSearch(side);
       clearUnits(side);
+      refreshModels(side);
+      state[side].photo = null;
+      field(side, 'photo-review').hidden = true;
+      field(side, 'photo-status').textContent = '';
+      field(side, 'label-photo').value = '';
       field(side, 'type').value = 'direct_cool';
-      field(side, 'brand').value = 'LG';
-      field(side, 'model').value = model;
+      field(side, 'brand').value = 'Example';
+      field(side, 'model').value = examples[side].model;
+      field(side, 'capacity').value = String(examples[side].capacity);
+      field(side, 'units').value = String(examples[side].units);
+      state[side].origin = 'example';
+      field(side, 'source').textContent = 'Illustrative figures only. Replace these with your fridge and its exact label before deciding.';
     }
     byId('new-price').value = '25000';
+    state.new.samplePrice = true;
+    byId('rate-low').value = '7';
+    byId('rate-high').value = '10';
+    byId('trade-in').value = '0';
+    byId('concern').value = '';
     byId('current-unusable').checked = false;
     render();
-    await Promise.all(['old', 'new'].map(side => searchModels(side, searchVersions[side])));
     byId('result-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
-  async function showUsage() {
-    if (location.protocol === 'file:') return;
-    try {
-      const response = await fetch('/api/stats', { cache: 'no-store' });
-      if (!response.ok) return;
-      const data = await response.json();
-      if (Number.isSafeInteger(data.total)) byId('usage-total').textContent = number(data.total);
-    } catch { /* Local calculation is unaffected. */ }
-  }
   byId('explain-button').addEventListener('click', async () => {
     if (!currentInput) return;
     const message = byId('ai-message');
     if (location.protocol === 'file:') {
       message.textContent = 'Gemini needs the deployed website. The calculator above still works here.';
+      return;
+    }
+    if (!claimAiAttempt()) {
+      message.textContent = 'You have used five AI attempts on this browser. The calculator still works without Gemini.';
       return;
     }
     const version = renderVersion;
@@ -337,7 +384,6 @@
       byId('answer-next').textContent = data.answer.next_step;
       byId('ai-answer').hidden = false;
       message.textContent = 'Explanation ready. The calculation above was done separately.';
-      if (Number.isSafeInteger(data.total)) byId('usage-total').textContent = number(data.total);
     } catch (error) {
       if (version === renderVersion) message.textContent = error.message + ' Your comparison is still available.';
     } finally {
@@ -359,7 +405,7 @@
     }
     const button = field(side, 'read-label');
     button.disabled = true;
-    status.textContent = 'Reading label with Gemini…';
+    status.textContent = 'Identifying fridge details with Gemini…';
     field(side, 'photo-review').hidden = true;
     try {
       const image = await new Promise((resolve, reject) => {
@@ -368,41 +414,48 @@
         reader.onerror = () => reject(new Error('Could not read that file.'));
         reader.readAsDataURL(file);
       });
+      if (!claimAiAttempt()) {
+        status.textContent = 'You have used five AI attempts on this browser. Enter the label details manually.';
+        return;
+      }
       const response = await fetch('/api/label', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mime: file.type, image, side })
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Label reading is unavailable.');
+      if (!response.ok) throw new Error(data.error || 'Photo identification is unavailable.');
       state[side].photo = data.details;
       const d = data.details;
-      field(side, 'photo-preview').textContent = 'Gemini read: ' + (d.brand || 'brand unclear') + ' ' + (d.model || 'model unclear') +
-        '; ' + (typeNames[d.type] || 'type unclear') + '; ' + (d.capacity || 'capacity unclear') +
-        ' L; ' + (d.annualUnits || 'annual units unclear') + ' kWh/year. Check every value against your photo before using it.';
+      field(side, 'photo-preview').textContent = 'Gemini found: ' + (d.brand || 'brand unknown') + ' ' + (d.model || '(model number not visible)') +
+        '; ' + (typeNames[d.type] || 'type unknown') + '; ' + (d.capacity || 'capacity unknown') +
+        ' L; ' + (d.annualUnits || 'annual units unknown') + ' kWh/year. Review these details before using them.';
       field(side, 'photo-review').hidden = false;
-      status.textContent = 'Review before applying. The photo was sent for extraction but is not saved with the comparison.';
-      if (Number.isSafeInteger(data.total)) byId('usage-total').textContent = number(data.total);
+      status.textContent = 'Review before applying. The photo was sent to Gemini but its image bytes are not saved in the comparison.';
     } catch (error) {
-      status.textContent = error.message + ' You can enter the label details manually.';
+      status.textContent = error.message + ' You can still enter details manually.';
     } finally { button.disabled = false; }
   }
   function usePhoto(side) {
     const d = state[side].photo;
     if (!d) return;
     invalidateSearch(side);
-    if (d.type && typeNames[d.type]) field(side, 'type').value = d.type;
-    if (d.brand) field(side, 'brand').value = d.brand;
-    if (d.model) field(side, 'model').value = d.model;
-    if (d.capacity) field(side, 'capacity').value = String(d.capacity);
-    if (d.annualUnits) field(side, 'units').value = String(d.annualUnits);
-    state[side].selected = null;
+    clearUnits(side);
+    field(side, 'type').value = d.type && typeNames[d.type] ? d.type : '';
+    field(side, 'brand').value = d.brand || '';
+    field(side, 'model').value = d.model || '';
+    field(side, 'capacity').value = d.capacity ? String(d.capacity) : '';
+    field(side, 'units').value = d.annualUnits ? String(d.annualUnits) : '';
     state[side].origin = d.annualUnits ? 'photo' : null;
     refreshModels(side);
-    field(side, 'source').textContent = d.annualUnits ? 'You confirmed Gemini’s label reading. Check the exact annual units on your photo.' : 'Annual units were unreadable. Enter them from the label.';
+    field(side, 'source').textContent = d.annualUnits ?
+      'Photo details applied. Check the exact annual units visible in your photo.' : d.model && d.type && d.type !== 'other' ?
+      'Checking the visible model number against our catalogue…' :
+      'Photo details applied. The exact model or annual units were not visible, so an electricity payback cannot be calculated yet.';
     field(side, 'photo-review').hidden = true;
     state[side].photo = null;
     render();
+    if (!d.annualUnits && d.model && d.type && d.type !== 'other') void searchModels(side, searchVersions[side]);
   }
   render();
-  showUsage();
+  updateAiUsage();
 })();

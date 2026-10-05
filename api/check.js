@@ -1,5 +1,5 @@
 import { SYSTEM_PROMPT, parseInput, compare, safeModelOutput } from '../lib/decision.js';
-import { MODEL, MAX_OUTPUT_TOKENS, VISITOR_LIMIT, config, json, visitorFrom, claimQuota, writeExchange, getSuccessCount } from '../lib/server.js';
+import { MODEL, MAX_OUTPUT_TOKENS, config, json } from '../lib/server.js';
 
 export async function POST(request) {
   if ((request.headers.get('content-length') ?? '0') > 4096) return json({ error: 'Request is too large.' }, 413);
@@ -7,17 +7,9 @@ export async function POST(request) {
   try { input = parseInput(await request.json()); }
   catch (error) { return json({ error: error.message || 'Invalid comparison.' }, 400); }
 
-  const { visitor, cookie } = visitorFrom(request);
-  const headers = cookie ? { 'Set-Cookie': cookie } : {};
   let cfg;
   try { cfg = config(); }
-  catch { return json({ error: 'This check is not configured yet.' }, 503, headers); }
-
-  try {
-    if (!(await claimQuota(visitor))) return json({ error: `You have used ${VISITOR_LIMIT} checks on this browser.`, remaining: 0 }, 429, headers);
-  } catch {
-    return json({ error: 'The usage limit could not be checked. Please try again later.' }, 503, headers);
-  }
+  catch { return json({ error: 'This check is not configured yet.' }, 503); }
 
   const figures = compare(input);
   const payload = {
@@ -36,10 +28,6 @@ export async function POST(request) {
       }, required: ['summary', 'caveat', 'next_step'] }
     }
   };
-  let rawResponse = null;
-  let usage = { input_tokens: 0, output_tokens: 0 };
-  let answer;
-  let failure;
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
       method: 'POST',
@@ -47,25 +35,11 @@ export async function POST(request) {
       body: JSON.stringify(payload), signal: AbortSignal.timeout(7500)
     });
     if (!response.ok) throw new Error(`Gemini request failed (${response.status}).`);
-    rawResponse = await response.json();
-    usage = {
-      input_tokens: rawResponse.usageMetadata?.promptTokenCount ?? 0,
-      output_tokens: rawResponse.usageMetadata?.candidatesTokenCount ?? 0
-    };
+    const rawResponse = await response.json();
     const rawText = rawResponse.candidates?.[0]?.content?.parts?.map(p => p.text ?? '').join('') ?? '';
-    answer = safeModelOutput(rawText);
-  } catch (error) { failure = error; }
-
-  try {
-    await writeExchange({
-      visitor_id: visitor, input, output: answer ?? { error: String(failure?.message ?? 'Model error') },
-      ...usage, status: answer ? 'success' : 'error', model: MODEL
-    });
+    const answer = safeModelOutput(rawText);
+    return json({ figures, answer });
   } catch {
-    return json({ error: 'The response could not be saved. Please try again later.' }, 503, headers);
+    return json({ error: 'The AI explanation was unavailable.' }, 502);
   }
-  if (failure) return json({ error: 'The AI explanation was unavailable. Your attempt was recorded.' }, 502, headers);
-  let total = null;
-  try { total = await getSuccessCount(); } catch { /* The answer is still available; stats can retry. */ }
-  return json({ figures, answer, total, remaining: null }, 200, headers);
 }

@@ -4,12 +4,11 @@ This is the **calculator-only** website for the separate calculator repository a
 
 ~~~text
 index.html        Calculator at /
-app.js            Calculator interactions
+app.js            Photo-first calculator interactions
 catalog.js        Read-only Supabase refrigerator search
 payback.js        Local payback calculation
-api/              Optional Gemini and usage functions at /api/*
+api/              Optional Gemini functions at /api/*
 lib/              Server-only logic
-supabase.sql      Optional AI usage database setup
 test/             Automated tests
 ~~~
 
@@ -24,11 +23,17 @@ Keep your separately deployed landing page in its own repository. If it has a �
 
 ## Database and calculation
 
-The browser queries `public.refrigerator_models` through Supabase REST, filtered by fridge type, brand and model number. Only a unique exact model match fills annual kWh. The initial imported rows are a selected Direct Cool sample; other types can be searched as you add them or entered manually from their labels. Users enter the new fridge’s checkout price for payback. If the old label is missing, the calculator shows a five-year threshold rather than inventing consumption.
+Each fridge card starts with **one optional photo upload**. Gemini identifies details it can see, such as a brand logo, fridge type, or a printed model number. The user reviews those details before applying them. If a model number is visible, the browser checks `public.refrigerator_models` through Supabase REST and fills annual kWh only for a unique exact match. A visible BEE label can also supply annual units after review. An exterior-only photo may identify a brand or type but cannot reliably distinguish visually similar model variants, so it does not borrow the energy figure from a lookalike. No second photo is requested; manual details remain available in a collapsed section.
+
+The initial imported rows are a selected Direct Cool sample; other types can be searched as you add them or entered manually from their labels. Users enter the new fridge’s checkout price for payback. If the old label is missing, the calculator shows a five-year threshold rather than inventing consumption.
+
+“Try a filled example” uses clearly labelled, illustrative fridge figures built into the page, so it works even when model search is unavailable. It does not claim these figures came from BEE or represent an actual model. Users should replace all sample values with their own before making a decision.
 
 `catalog.js` contains a **publishable** Supabase key and project URL for public read-only model search. Confirm the key character-for-character against your Supabase dashboard. Never put a secret or service-role key in browser code. The `public` schema and table must be exposed via the Data API, and `anon` must have a read-only `SELECT` grant and RLS policy. Search uses `brand`, `model_number`, `fridge_type`, `annual_kwh` and `stars`.
 
-The optional **Explain with Gemini**, **Read label photo**, and usage count need server routes and Vercel environment variables `GEMINI_API_KEY`, `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`. Run `supabase.sql` once for those optional usage tables; it does not create the refrigerator model catalogue. Keep these server credentials out of browser files and GitHub. Manual entry and payback remain available if model search or Gemini is unavailable.
+The optional **Explain with Gemini** and **Identify from photo** features need server routes and one Vercel environment variable, `GEMINI_API_KEY`. Keep this key in Vercel, never in browser files or GitHub. The browser stores a shared count of five AI attempts in `localStorage`, including attempts that fail after a request starts. The image is sent to Gemini for identification; images, extracted text, prompts and answers are not written to Supabase. The separate, read-only refrigerator catalogue still uses Supabase. Manual entry and payback remain available if model search or Gemini is unavailable.
+
+The browser count is a convenience limit only: clearing storage, changing browsers, or calling `/api/check` and `/api/label` directly bypasses it. It does not enforce a cost limit for the Gemini key. Set a provider quota or other server-side protection before a public launch if spending must be capped. If you previously created `upgradecheck_quota`, `claim_upgradecheck` or `upgrade_checks` in Supabase, the new code does not use them. It also does not delete existing data; inspect and remove obsolete objects separately if desired. The server no longer needs `SUPABASE_SERVICE_KEY` or `SUPABASE_URL`, though `catalog.js` still contains the public project URL and publishable key for fridge search.
 
 ## Verify locally
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#102a32">
-  <meta name="description" content="Name the fridge you have and the fridge you want. Compare their labelled electricity use and see when savings might cover the new fridge's price.">
+  <meta name="description" content="Photograph the fridge you have and the fridge you want. Confirm their labelled electricity use and compare the cost of upgrading.">
   <title>UpgradeCheck — Compare your fridges</title>
   <style>
     :root { color-scheme:light; --ink:#102a32; --muted:#456069; --teal:#096d69; --deep:#075956; --cream:#f6f8f5; --line:#cbded9; --mint:#e7f2ef; --amber:#e1ae64; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -44,7 +44,6 @@
     .data-note { color:var(--muted); font-size:.83rem; }
     .answer h3 { margin:0 0 8px; font-size:1rem; } .answer p { margin:8px 0; }
     .usage { background:#edf7f4; border:1px solid #bfdbd4; border-radius:13px; padding:15px 18px; margin-top:20px; color:var(--muted); }
-    .usage strong { color:var(--teal); font-size:1.32rem; }
     .details { background:white; border-top:1px solid var(--line); padding:52px 0 60px; }
     .details h2 { margin:0 0 24px; font-size:clamp(1.55rem,2.6vw,2.2rem); letter-spacing:-.04em; }
     .detail-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
@@ -72,6 +71,13 @@
     .label-box summary { cursor:pointer; color:var(--teal); font-size:.85rem; font-weight:750; }
     .label-box .field { margin:12px 0 9px; }
     .label-box input[type=file] { min-height:unset; padding:9px; }
+    .photo-first { background:var(--mint); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; }
+    .photo-first .field { margin-bottom:10px; }
+    .photo-first input[type=file] { min-height:unset; background:white; padding:9px; }
+    .manual-details { border:1px solid var(--line); border-radius:12px; padding:14px; margin:15px 0; }
+    .manual-details summary { cursor:pointer; font-weight:750; color:var(--teal); }
+    .manual-details .form-grid { margin-top:17px; }
+    .photo-summary { color:var(--ink); margin:10px 0 0; font-size:.86rem; line-height:1.5; }
     .subtle-button { background:white; color:var(--teal); border:1px solid var(--teal); padding:9px 13px; border-radius:9px; font-weight:750; cursor:pointer; }
     .subtle-button:hover { background:var(--mint); }
     .small-status { display:block; color:var(--muted); font-size:.8rem; line-height:1.45; margin-top:8px; }
@@ -102,46 +108,48 @@
   <header><div class="wrap head"><span class="brand"><span class="mark" aria-hidden="true">uc</span>UpgradeCheck</span></div></header>
   <main id="top">
     <section class="calculator" aria-labelledby="title"><div class="wrap">
-      <div class="intro"><p class="eyebrow">Fridge electricity payback</p><h1 id="title">Will the fridge you want pay for itself?</h1><p>Name the fridge you use now and the specific one you want. See whether lower electricity use could recover its purchase price. <button class="sample" id="try-sample" type="button">Try a filled example</button></p></div>
+      <div class="intro"><p class="eyebrow">Fridge electricity payback</p><h1 id="title">Will the fridge you want pay for itself?</h1><p>Upload one photo of each fridge. Gemini reads what it can identify, and UpgradeCheck checks for an exact model in our catalogue. Then see the comparison available from those details. <button class="sample" id="try-sample" type="button">Try a filled example</button> (illustrative figures)</p></div>
       <form id="check-form" novalidate>
         <div class="compare-grid">
           <section class="card compare-card" aria-labelledby="old-title">
             <h2 id="old-title"><span class="step">1</span> My current fridge</h2>
-            <p class="card-intro">Look for the model number on its label or inside the door. An approximate name is okay if the model is missing from our search.</p>
-            <div class="form-grid">
+            <p class="card-intro">Upload a photo of your current fridge. A visible label or model number helps identify it precisely.</p>
+            <div class="photo-first">
+              <label class="field">Photo of my current fridge (JPG, PNG or WebP; up to 2 MB)<input id="old-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+              <button class="subtle-button" id="old-read-label" type="button">Identify from photo with Gemini</button>
+              <span class="small-status" id="old-photo-status" role="status"></span>
+              <div class="data-note" id="old-photo-review" hidden><p id="old-photo-preview"></p><button class="subtle-button" id="old-use-photo" type="button">Use these details</button> <button class="sample" id="old-dismiss-photo" type="button">Dismiss</button></div>
+              <p class="photo-summary" id="old-identified">No photo details applied yet.</p>
+            </div>
+            <details class="manual-details"><summary>Review, search or enter fridge details manually</summary><div class="form-grid">
               <label class="field">Type<select id="old-type" name="oldType"><option value="">Choose type</option><option value="direct_cool">Direct Cool</option><option value="frost_free">Frost Free</option><option value="side_by_side">Side by Side</option><option value="multi_door">Multi Door</option><option value="other">Other / not sure</option></select></label>
               <label class="field">Brand<input id="old-brand" name="oldBrand" list="brand-options" maxlength="60" placeholder="e.g. LG" autocomplete="off"></label>
               <label class="field wide">Model number<input id="old-model" name="oldModel" list="old-model-options" maxlength="80" placeholder="e.g. GL-B199OSLC; leave blank if unknown" autocomplete="off"></label>
               <label class="field">Capacity (litres, optional)<input id="old-capacity" name="oldCapacity" type="number" min="30" max="1500" step="1" placeholder="e.g. 185"></label>
               <label class="field">Labelled annual units (kWh/year)<input id="old-units" name="oldUnits" type="number" min="1" max="5000" step="any" placeholder="Auto-filled for matches"></label>
-            </div>
-            <p class="source-line" id="old-source">Choose a type, then search by brand or model. If your fridge is missing, enter its label’s annual units.</p>
-            <p class="label-help">If the model is not listed, enter its label's annual units. Do not use the star count as the annual units.</p>
-            <details class="label-box"><summary>Have a label photo? Read it with Gemini</summary>
-              <label class="field">Photo of the energy label (JPG, PNG or WebP; up to 2 MB)<input id="old-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
-              <button class="subtle-button" id="old-read-label" type="button">Extract details for my review</button>
-              <span class="small-status" id="old-photo-status" role="status"></span>
-              <div class="data-note" id="old-photo-review" hidden><p id="old-photo-preview"></p><button class="subtle-button" id="old-use-photo" type="button">Use these details</button> <button class="sample" id="old-dismiss-photo" type="button">Dismiss</button></div>
-            </details>
+            </div></details>
+            <p class="source-line" id="old-source">Upload a photo and review what Gemini finds. Exact model or label units are needed for electricity payback.</p>
+            <p class="label-help">Only an exact model match or readable energy label can supply annual units. A visually similar fridge is not a substitute.</p>
             <label class="field" style="margin-top:16px;font-weight:600"><input id="current-unusable" type="checkbox" style="display:inline;width:auto;min-height:unset;margin:0 7px 0 0;vertical-align:middle">I have to replace this fridge; keeping it is not an option</label>
           </section>
           <section class="card compare-card" aria-labelledby="new-title">
             <h2 id="new-title"><span class="step">2</span> The fridge I want</h2>
-            <p class="card-intro">Choose any size or type. A larger Frost Free model can be compared with a smaller Direct Cool fridge.</p>
-            <div class="form-grid">
+            <p class="card-intro">Photograph the fridge you want, its shop listing, or its BEE label. A larger Frost Free model can be compared with a smaller Direct Cool fridge.</p>
+            <div class="photo-first">
+              <label class="field">Photo of the fridge I want (JPG, PNG or WebP; up to 2 MB)<input id="new-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+              <button class="subtle-button" id="new-read-label" type="button">Identify from photo with Gemini</button>
+              <span class="small-status" id="new-photo-status" role="status"></span>
+              <div class="data-note" id="new-photo-review" hidden><p id="new-photo-preview"></p><button class="subtle-button" id="new-use-photo" type="button">Use these details</button> <button class="sample" id="new-dismiss-photo" type="button">Dismiss</button></div>
+              <p class="photo-summary" id="new-identified">No photo details applied yet.</p>
+            </div>
+            <details class="manual-details"><summary>Review, search or enter fridge details manually</summary><div class="form-grid">
               <label class="field">Type<select id="new-type" name="newType"><option value="">Choose type</option><option value="direct_cool">Direct Cool</option><option value="frost_free">Frost Free</option><option value="side_by_side">Side by Side</option><option value="multi_door">Multi Door</option><option value="other">Other / not sure</option></select></label>
               <label class="field">Brand<input id="new-brand" name="newBrand" list="brand-options" maxlength="60" placeholder="e.g. Samsung" autocomplete="off"></label>
               <label class="field wide">Model number<input id="new-model" name="newModel" list="new-model-options" maxlength="80" placeholder="Search the exact model you want" autocomplete="off"></label>
               <label class="field">Capacity (litres, optional)<input id="new-capacity" name="newCapacity" type="number" min="30" max="1500" step="1" placeholder="e.g. 260"></label>
               <label class="field">Labelled annual units (kWh/year)<input id="new-units" name="newUnits" type="number" min="1" max="5000" step="any" placeholder="Auto-filled for matches"></label>
-            </div>
-            <p class="source-line" id="new-source">Choose an exact model suggestion when available, or enter its label's annual units.</p>
-            <details class="label-box"><summary>Have a label photo? Read it with Gemini</summary>
-              <label class="field">Photo of the energy label (JPG, PNG or WebP; up to 2 MB)<input id="new-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
-              <button class="subtle-button" id="new-read-label" type="button">Extract details for my review</button>
-              <span class="small-status" id="new-photo-status" role="status"></span>
-              <div class="data-note" id="new-photo-review" hidden><p id="new-photo-preview"></p><button class="subtle-button" id="new-use-photo" type="button">Use these details</button> <button class="sample" id="new-dismiss-photo" type="button">Dismiss</button></div>
-            </details>
+            </div></details>
+            <p class="source-line" id="new-source">Upload a photo and review what Gemini finds. Exact model or label units are needed for electricity payback.</p>
             <div class="purchase">
               <label class="field">Checkout price for this fridge (₹)<input id="new-price" name="newPrice" type="number" min="1" max="1000000" step="any" placeholder="Enter the price you would pay"></label>
               <p>Model data does not include a reliable shop price. Leave this blank to compare annual electricity use; add it to see payback years.</p>
@@ -162,7 +170,7 @@
       <section class="card result-card" aria-labelledby="result-title" aria-live="polite">
         <div class="result-header"><div><p class="eyebrow">Your comparison</p><h2 id="result-title">Electricity payback</h2></div><button id="copy-result" class="subtle-button" type="button" hidden>Copy result</button></div>
         <p id="result-headline" class="result-headline">Start with your two fridges</p>
-        <p id="result-detail" class="result-detail">Choose their types, enter the brands and models you know, then confirm their labelled annual units. The result updates here as you go.</p>
+        <p id="result-detail" class="result-detail">Upload photos for both fridges. Confirm any visible model number or label reading, then add the new fridge’s checkout price to see the payback scenario.</p>
         <p id="form-message" class="message" role="status" hidden></p>
         <div id="result-content" hidden>
           <div class="metrics">
@@ -177,7 +185,7 @@
           <p id="ai-message" class="message" role="status"></p>
           <div id="ai-answer" class="answer" hidden><h3>Gemini's explanation</h3><p id="answer-summary"></p><p id="answer-caveat"></p><p id="answer-next"></p></div>
         </div>
-        <div class="usage"><strong id="usage-total">—</strong><span> AI assists saved so far</span><p class="hint">Label photo extraction and explanations share a five-attempt limit per browser. The calculator has no limit.</p></div>
+        <div class="usage"><p id="ai-remaining" aria-live="polite">5 of 5 AI attempts remaining on this browser.</p><p class="hint">Photo identification and explanations share this browser's five attempts. The calculator has no limit.</p></div>
       </section>
     </div></section>
     <section class="details" id="how-it-works" aria-labelledby="details-title"><div class="wrap">

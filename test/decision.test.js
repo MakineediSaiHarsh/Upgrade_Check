@@ -54,52 +54,45 @@ test('input validation and model output guardrails reject unsupported claims',()
   assert.doesNotThrow(()=>safeModelOutput(JSON.stringify({summary:'This is a label scenario.',caveat:'UpgradeCheck is not BEE endorsed.',next_step:'Check your label.'})));
 });
 
-test('AI route logs model input and output while leaving the local calculator independent',async t=>{
+test('AI route uses the Gemini key without any Supabase request',async t=>{
   const oldFetch=globalThis.fetch;const oldEnv={...process.env};
   t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
   process.env.GEMINI_API_KEY='test-secret';
-  process.env.SUPABASE_URL='https://example.supabase.co';
-  process.env.SUPABASE_SERVICE_KEY='test-db-secret';
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_SERVICE_KEY;
   const calls=[];
   globalThis.fetch=async(url,options)=>{
     calls.push({url,options});
-    if(url.endsWith('/rpc/claim_upgradecheck'))return Response.json(true);
     if(url.includes('generativelanguage'))return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({summary:'The selected labels imply savings.',caveat:'Actual home use may differ.',next_step:'Confirm both labels.'})}]}}],usageMetadata:{promptTokenCount:92,candidatesTokenCount:38}});
-    if(url.endsWith('/upgrade_checks'))return new Response(null,{status:201});
-    if(url.includes('select=id'))return new Response(null,{status:200,headers:{'content-range':'0-0/5'}});
     throw new Error(`Unexpected URL: ${url}`);
   };
   const response=await POST(new Request('https://example.vercel.app/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)}));
   const data=await response.json();
   assert.equal(response.status,200);
   assert.equal(data.figures.annualUnitsSaved,280);
-  assert.equal(data.total,5);
-  assert.equal(calls.length,4);
-  const payload=JSON.parse(calls[1].options.body);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].options.headers['x-goog-api-key'],'test-secret');
+  const payload=JSON.parse(calls[0].options.body);
   assert.deepEqual(JSON.parse(payload.contents[0].parts[0].text).currentFridge,{name:'Old fridge',type:'other',capacityLitres:null,source:'unknown'});
-  assert.equal(JSON.parse(calls[2].options.body).output_tokens,38);
 });
 
-test('quota rejection prevents Gemini call',async t=>{
+test('missing Gemini configuration prevents an external call',async t=>{
   const oldFetch=globalThis.fetch;const oldEnv={...process.env};
   t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
-  process.env.GEMINI_API_KEY='test';process.env.SUPABASE_URL='https://example.supabase.co';process.env.SUPABASE_SERVICE_KEY='test';
+  delete process.env.GEMINI_API_KEY;
   let calls=0;globalThis.fetch=async()=>{calls++;return Response.json(false);};
   const response=await POST(new Request('https://example.vercel.app/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)}));
-  assert.equal(response.status,429);assert.equal(calls,1);
+  assert.equal(response.status,503);assert.equal(calls,0);
 });
 
-test('label reading returns reviewable fields without storing image bytes',async t=>{
+test('label reading returns reviewable fields without contacting Supabase',async t=>{
   const oldFetch=globalThis.fetch;const oldEnv={...process.env};
   t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
-  process.env.GEMINI_API_KEY='test-secret';process.env.SUPABASE_URL='https://example.supabase.co';process.env.SUPABASE_SERVICE_KEY='test-db-secret';
+  process.env.GEMINI_API_KEY='test-secret';delete process.env.SUPABASE_URL;delete process.env.SUPABASE_SERVICE_KEY;
   const calls=[];
   globalThis.fetch=async(url,options)=>{
     calls.push({url,options});
-    if(url.endsWith('/rpc/claim_upgradecheck'))return Response.json(true);
     if(url.includes('generativelanguage'))return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({brand:'LG',model:'GLD235',type:'direct_cool',capacity:'224',annualUnits:'118'})}]}}],usageMetadata:{promptTokenCount:300,candidatesTokenCount:40}});
-    if(url.endsWith('/upgrade_checks'))return new Response(null,{status:201});
-    if(url.includes('select=id'))return new Response(null,{status:200,headers:{'content-range':'0-0/7'}});
     throw new Error('Unexpected '+url);
   };
   const photo=Buffer.from('test-photo').toString('base64');
@@ -108,9 +101,10 @@ test('label reading returns reviewable fields without storing image bytes',async
   assert.equal(response.status,200);
   assert.equal(data.details.annualUnits,118);
   assert.equal(data.details.type,'direct_cool');
-  const saved=JSON.parse(calls[2].options.body);
-  assert.equal(saved.input.task,'label_extract');
-  assert.equal(saved.input.image_bytes,10);
-  assert.equal(JSON.stringify(saved).includes(photo),false);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].options.headers['x-goog-api-key'],'test-secret');
   assert.equal(parseLabel(JSON.stringify({brand:'',model:'',type:'',capacity:'',annualUnits:'5 stars'})).annualUnits,null);
+  assert.deepEqual(parseLabel(JSON.stringify({brand:'LG',model:'',type:'direct_cool',capacity:'',annualUnits:''})),
+    {brand:'LG',model:'',type:'direct_cool',capacity:null,annualUnits:null});
+  assert.match(JSON.parse(calls[0].options.body).systemInstruction.parts[0].text,/never infer an exact model from an exterior design/i);
 });

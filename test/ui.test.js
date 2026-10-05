@@ -29,13 +29,25 @@ test('model-first page calculates locally and handles missing and cross-type mod
     { brand: 'Samsung', model_number: 'FrostFree 260', fridge_type: 'Frost Free', total_volume_l: 260, annual_kwh: 240, stars: 3, verification_status: 'provisional' }
   ];
   let failCatalog = false;
+  let photoDetails = { brand: 'LG', model: 'GL-B199OSLC', type: 'direct_cool', capacity: null, annualUnits: null };
+  let photoCalls = 0;
+  let explainCalls = 0;
+  const stored = new Map();
   const queries = [];
   const context = {
     Intl, Number, String, Math, console, URLSearchParams, setTimeout, clearTimeout,
     location: { protocol: 'https:' },
     navigator: { clipboard: { writeText: async () => {} } },
+    localStorage: { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) },
+    FileReader: class {
+      readAsDataURL() { this.result = 'data:image/png;base64,dGVzdA=='; this.onload(); }
+    },
     fetch: async (url, options) => {
-      if (String(url).includes('/api/stats')) return { ok: false };
+      if (String(url).includes('/api/label')) { photoCalls++; return { ok: true, json: async () => ({ details: photoDetails }) }; }
+      if (String(url).includes('/api/check')) {
+        explainCalls++;
+        return { ok: true, json: async () => ({ answer: { summary: 'Scenario', caveat: 'Check labels', next_step: 'Compare costs' } }) };
+      }
       const parsed = new URL(url);
       queries.push({ parsed, options });
       if (failCatalog) throw new TypeError('Failed to fetch');
@@ -52,20 +64,22 @@ test('model-first page calculates locally and handles missing and cross-type mod
   for (const file of ['catalog.js', 'payback.js', 'app.js']) {
     vm.runInContext(await fs.readFile(new URL('../' + file, import.meta.url), 'utf8'), context, { filename: file });
   }
+  failCatalog = true;
   await elements['try-sample'].listeners.click();
-  assert.equal(queries.length, 2);
-  assert.ok(queries.every(q => q.parsed.hostname.endsWith('.supabase.co') && q.options.headers.apikey.startsWith('sb_publishable_')));
-  assert.ok(queries.every(q => q.parsed.searchParams.get('select') === 'brand,model_number,fridge_type,annual_kwh,stars'));
+  assert.equal(queries.length, 0, 'the filled example should work without Supabase');
+  failCatalog = false;
   assert.equal(elements['old-type'].value, 'direct_cool');
-  assert.equal(elements['old-brand'].value, 'LG');
-  assert.equal(elements['old-model'].value, 'GL-B199OSLC');
-  assert.equal(elements['new-model'].value, 'GLD235');
-  assert.equal(elements['old-units'].value, '190');
-  assert.equal(elements['new-units'].value, '118');
+  assert.equal(elements['old-brand'].value, 'Example');
+  assert.equal(elements['old-model'].value, 'Current 190 L');
+  assert.equal(elements['new-model'].value, 'New 220 L');
+  assert.equal(elements['old-units'].value, '360');
+  assert.equal(elements['new-units'].value, '160');
   assert.equal(elements['result-content'].hidden, false);
   assert.match(elements['result-headline'].textContent, /years/);
-  assert.match(elements['units-result'].textContent, /72 fewer/);
-  assert.equal(elements['usage-total'].textContent, '');
+  assert.match(elements['units-result'].textContent, /200 fewer/);
+  assert.match(elements['result-basis'].textContent, /Illustrative example only/);
+  assert.match(elements['data-note'].textContent, /illustrative example figures/);
+  assert.match(elements['ai-remaining'].textContent, /5 of 5/);
 
   elements['old-units'].value = '220';
   elements['old-units'].listeners.input();
@@ -100,12 +114,17 @@ test('model-first page calculates locally and handles missing and cross-type mod
   elements['new-type'].value = 'frost_free';
   elements['new-type'].listeners.change();
   assert.equal(elements['new-units'].value, '');
+  assert.equal(elements['new-capacity'].value, '');
+  assert.equal(elements['new-price'].value, '');
   assert.match(elements['new-source'].textContent, /Searching|annual units/);
   elements['new-brand'].value = 'Samsung';
   elements['new-brand'].listeners.input();
   elements['new-model'].value = 'FrostFree 260';
   elements['new-model'].listeners.input();
   await new Promise(resolve => setTimeout(resolve, 300));
+  assert.ok(queries.length > 0);
+  assert.ok(queries.every(q => q.parsed.hostname.endsWith('.supabase.co') && q.options.headers.apikey.startsWith('sb_publishable_')));
+  assert.ok(queries.every(q => q.parsed.searchParams.get('select') === 'brand,model_number,fridge_type,annual_kwh,stars'));
   assert.equal(elements['new-units'].value, '240');
   assert.match(elements['new-source'].textContent, /Catalogue match/);
   elements['new-units'].value = '240';
@@ -122,4 +141,38 @@ test('model-first page calculates locally and handles missing and cross-type mod
   elements['old-units'].listeners.input();
   assert.equal(elements['old-units'].value, '210');
   assert.equal(elements['result-content'].hidden, false);
+
+  failCatalog = false;
+  elements['old-label-photo'].files = [{ type: 'image/png', size: 10 }];
+  await elements['old-read-label'].listeners.click();
+  assert.equal(elements['old-photo-review'].hidden, false);
+  assert.match(elements['old-photo-preview'].textContent, /GL-B199OSLC/);
+  elements['old-use-photo'].listeners.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(elements['old-model'].value, 'GL-B199OSLC');
+  assert.equal(elements['old-units'].value, '190');
+  assert.match(elements['old-source'].textContent, /Catalogue match/);
+
+  photoDetails = { brand: 'LG', model: '', type: 'direct_cool', capacity: null, annualUnits: null };
+  await elements['old-read-label'].listeners.click();
+  elements['old-use-photo'].listeners.click();
+  assert.equal(elements['old-model'].value, '');
+  assert.equal(elements['old-units'].value, '');
+  assert.match(elements['old-source'].textContent, /exact model or annual units were not visible/);
+  assert.match(elements['old-identified'].textContent, /annual units unknown/);
+  assert.equal(photoCalls, 2);
+  assert.equal(stored.get('upgradecheck_ai_attempts_v1'), '2');
+  assert.match(elements['ai-remaining'].textContent, /3 of 5/);
+  await elements['explain-button'].listeners.click();
+  assert.equal(explainCalls, 1);
+  assert.match(elements['ai-remaining'].textContent, /2 of 5/);
+  for (let i = 0; i < 2; i++) await elements['old-read-label'].listeners.click();
+  assert.equal(photoCalls, 4);
+  assert.match(elements['ai-remaining'].textContent, /0 of 5/);
+  await elements['old-read-label'].listeners.click();
+  assert.equal(photoCalls, 4);
+  assert.match(elements['old-photo-status'].textContent, /used five AI attempts/);
+  await elements['explain-button'].listeners.click();
+  assert.equal(explainCalls, 1);
+  assert.match(elements['ai-message'].textContent, /used five AI attempts/);
 });
