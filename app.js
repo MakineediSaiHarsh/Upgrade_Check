@@ -5,8 +5,8 @@
   const form = byId('check-form');
   const typeNames = { direct_cool: 'Direct Cool', frost_free: 'Frost Free', side_by_side: 'Side by Side', multi_door: 'Multi Door', other: 'Other / not sure' };
   const state = {
-    old: { selected: null, origin: null, photo: null, suggestion: null },
-    new: { selected: null, origin: null, photo: null, suggestion: null, samplePrice: false }
+    old: { selected: null, origin: null, photo: null, suggestions: [] },
+    new: { selected: null, origin: null, photo: null, suggestions: [], samplePrice: false }
   };
   const currency = n => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
   const number = n => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
@@ -176,9 +176,12 @@
     field(side, 'read-label').addEventListener('click', () => readLabel(side));
     field(side, 'use-photo').addEventListener('click', () => usePhoto(side));
     field(side, 'use-suggestion').addEventListener('click', () => useSuggestion(side));
+    field(side, 'photo-options').addEventListener('change', () => {
+      field(side, 'use-suggestion').disabled = field(side, 'photo-options').value === '';
+    });
     field(side, 'dismiss-photo').addEventListener('click', () => {
       state[side].photo = null;
-      state[side].suggestion = null;
+      state[side].suggestions = [];
       field(side, 'photo-review').hidden = true;
     });
   }
@@ -349,9 +352,10 @@
       clearUnits(side);
       refreshModels(side);
       state[side].photo = null;
-      state[side].suggestion = null;
+      state[side].suggestions = [];
       field(side, 'photo-review').hidden = true;
       field(side, 'photo-suggestion').hidden = true;
+      field(side, 'photo-options-label').hidden = true;
       field(side, 'use-suggestion').hidden = true;
       field(side, 'photo-status').textContent = '';
       field(side, 'label-photo').value = '';
@@ -410,6 +414,35 @@
     }
   });
 
+  function representativeIndex(rows, capacity) {
+    const withCapacity = rows.filter(row => Number.isFinite(row.litres) && row.litres > 0);
+    let pool = rows;
+    if (withCapacity.length) {
+      const capacities = withCapacity.map(row => row.litres).sort((a, b) => a - b);
+      const target = capacity || capacities[Math.floor((capacities.length - 1) / 2)];
+      const distance = Math.min(...withCapacity.map(row => Math.abs(row.litres - target)));
+      pool = withCapacity.filter(row => Math.abs(row.litres - target) === distance);
+    }
+    const energies = pool.map(row => row.kwh).sort((a, b) => a - b);
+    const targetEnergy = energies[Math.floor((energies.length - 1) / 2)];
+    return rows.indexOf(pool.find(row => row.kwh === targetEnergy));
+  }
+
+  function applyProxy(side, row) {
+    invalidateSearch(side);
+    clearUnits(side);
+    field(side, 'type').value = row.type;
+    field(side, 'brand').value = row.brand;
+    field(side, 'model').value = row.model;
+    field(side, 'capacity').value = row.litres ? String(row.litres) : '';
+    field(side, 'units').value = String(row.kwh);
+    state[side].origin = 'proxy';
+    field(side, 'source').textContent = 'Illustrative catalogue match: ' + row.brand + ' ' + row.model +
+      (row.litres ? ', ' + row.litres + ' L' : '') + (row.stars ? ', ' + row.stars + ' stars' : '') +
+      ', ' + row.kwh + ' units/year. Please check the model and figures against your fridge’s label.';
+    render();
+  }
+
   async function readLabel(side) {
     const status = field(side, 'photo-status');
     const file = field(side, 'label-photo').files[0];
@@ -427,8 +460,10 @@
     status.textContent = 'Identifying fridge details with Gemini…';
     field(side, 'photo-review').hidden = true;
     field(side, 'photo-suggestion').hidden = true;
+    field(side, 'photo-options-label').hidden = true;
     field(side, 'use-suggestion').hidden = true;
-    state[side].suggestion = null;
+    field(side, 'use-suggestion').disabled = true;
+    state[side].suggestions = [];
     try {
       const image = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -436,18 +471,13 @@
         reader.onerror = () => reject(new Error('Could not read that file.'));
         reader.readAsDataURL(file);
       });
-      let candidates = [];
-      try {
-        candidates = (await catalog.list()).filter(candidate => candidate.brand.length <= 60 && candidate.model.length <= 80);
-      } catch { /* Visible-label extraction can still work. */ }
       if (!claimAiAttempt()) {
         status.textContent = 'You have used five AI attempts on this browser. Enter the label details manually.';
         return;
       }
       const response = await fetch('/api/label', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mime: file.type, image, side,
-          candidates: candidates.map(({ brand, model, type }) => ({ brand, model, type })) })
+        body: JSON.stringify({ mime: file.type, image, side })
       });
       let data;
       try { data = await response.json(); }
@@ -464,19 +494,45 @@
       field(side, 'photo-preview').textContent = 'Gemini found: ' + (d.brand || 'brand unknown') + ' ' + (d.model || '(model number not visible)') +
         '; ' + (typeNames[d.type] || 'type unknown') + '; ' + (d.capacity || 'capacity unknown') +
         ' L; ' + (d.annualUnits || 'annual units unknown') + ' kWh/year. Review these details before using them.';
-      const suggestion = data.suggestion && candidates[data.suggestion.index];
-      if (suggestion && data.suggestion.basis === 'brand_and_type' && !d.model && !d.annualUnits) {
-        state[side].suggestion = suggestion;
-        field(side, 'photo-suggestion').textContent = 'Closest catalogue suggestion from visible brand and type: ' +
-          suggestion.brand + ' ' + suggestion.model + ' (' + typeNames[suggestion.type] + ', ' + number(suggestion.kwh) +
-          ' units/year). Its annual units may be different from your fridge’s. Use only as an illustrative proxy.';
-        field(side, 'photo-suggestion').hidden = false;
-        field(side, 'use-suggestion').hidden = false;
-      }
       field(side, 'photo-review').hidden = false;
-      status.textContent = candidates.length ?
-        'Review before applying. The photo was sent to Gemini but its image bytes are not saved in the comparison.' :
-        'Review before applying. Catalogue suggestions are unavailable right now; visible photo details can still be used.';
+      status.textContent = 'Review before applying. The photo was sent to Gemini but its image bytes are not saved in the comparison.';
+      if (d.brand && d.type && d.type !== 'other' && !d.model && !d.annualUnits) {
+        try {
+          const rows = (await catalog.search({ brand: d.brand, type: d.type }))
+            .filter(row => norm(row.brand) === norm(d.brand) && row.type === d.type);
+          if (rows.length) {
+            state[side].suggestions = rows;
+            const options = field(side, 'photo-options');
+            options.replaceChildren();
+            const empty = document.createElement('option');
+            empty.value = '';
+            empty.textContent = 'Choose another model';
+            options.appendChild(empty);
+            rows.forEach((row, index) => {
+              const option = document.createElement('option');
+              option.value = String(index);
+              option.textContent = row.model + (row.litres ? ' · ' + row.litres + ' L' : '') +
+                (row.stars ? ' · ' + row.stars + ' stars' : '') + ' · ' + row.kwh + ' units/year';
+              options.appendChild(option);
+            });
+            const pick = representativeIndex(rows, d.capacity);
+            options.value = String(pick);
+            field(side, 'photo-options-label').hidden = false;
+            field(side, 'use-suggestion').hidden = false;
+            field(side, 'use-suggestion').disabled = false;
+            field(side, 'photo-suggestion').textContent = d.capacity ?
+              'We prefilled a catalogue model of the same brand and type with the nearest listed capacity. This is an illustrative match, not an identification. Check its model, capacity and annual units.' :
+              'We prefilled a representative ' + d.brand + ' ' + typeNames[d.type] + ' catalogue model. The photo did not show its model or capacity, so it may use very different electricity. Check its model, capacity and annual units.';
+            field(side, 'photo-suggestion').hidden = false;
+            applyProxy(side, rows[pick]);
+            status.textContent = 'Illustrative catalogue details filled. Please check them before relying on the comparison.';
+          } else {
+            status.textContent = 'No ' + d.brand + ' ' + typeNames[d.type] + ' models found in the catalogue. Apply visible details or enter your label manually.';
+          }
+        } catch {
+          status.textContent = 'Catalogue search is unavailable. Apply visible details or enter your label manually.';
+        }
+      }
     } catch (error) {
       status.textContent = error instanceof TypeError ? 'Could not reach the photo service. Try again later or enter details manually.' : error.message;
     } finally { button.disabled = false; }
@@ -499,26 +555,16 @@
       'Photo details applied. The exact model or annual units were not visible, so an electricity payback cannot be calculated yet.';
     field(side, 'photo-review').hidden = true;
     state[side].photo = null;
-    state[side].suggestion = null;
+    state[side].suggestions = [];
     render();
     if (!d.annualUnits && d.model && d.type && d.type !== 'other') void searchModels(side, searchVersions[side]);
   }
   function useSuggestion(side) {
-    const suggestion = state[side].suggestion;
+    const index = Number(field(side, 'photo-options').value);
+    const suggestion = field(side, 'photo-options').value === '' ? null : state[side].suggestions[index];
     if (!suggestion) return;
-    invalidateSearch(side);
-    clearUnits(side);
-    field(side, 'type').value = suggestion.type;
-    field(side, 'brand').value = suggestion.brand;
-    field(side, 'model').value = suggestion.model;
-    field(side, 'capacity').value = '';
-    field(side, 'units').value = String(suggestion.kwh);
-    state[side].origin = 'proxy';
-    field(side, 'source').textContent = 'Illustrative proxy: this is the suggested catalogue model’s annual use, not a verified reading for your fridge.';
-    field(side, 'photo-review').hidden = true;
-    state[side].photo = null;
-    state[side].suggestion = null;
-    render();
+    applyProxy(side, suggestion);
+    field(side, 'photo-status').textContent = 'Illustrative catalogue details updated. Please check them before relying on the comparison.';
   }
   render();
   updateAiUsage();

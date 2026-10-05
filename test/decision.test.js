@@ -121,7 +121,7 @@ test('label reading returns reviewable fields without contacting Supabase',async
   assert.match(JSON.parse(calls[0].options.body).systemInstruction.parts[0].text,/model number must be legible in the photo, never inferred from exterior design/i);
 });
 
-test('photo route suggests a catalogue proxy but never inserts its annual units as a visible label reading',async t=>{
+test('photo route returns visible details without inventing a model from catalogue text',async t=>{
   const oldFetch=globalThis.fetch;const oldEnv={...process.env};
   t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
   process.env.GEMINI_API_KEY='test-secret';
@@ -130,20 +130,17 @@ test('photo route suggests a catalogue proxy but never inserts its annual units 
     assert.match(url,/generativelanguage/);
     payload=JSON.parse(options.body);
     return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({
-      brand:'LG',model:'',type:'direct_cool',capacity:'',annualUnits:'',candidateIndex:1
+      brand:'LG',model:'',type:'direct_cool',capacity:'',annualUnits:''
     })}]}}]});
   };
-  const candidates=[
-    {brand:'LG',model:'GL-B199OSLC',type:'direct_cool'},
-    {brand:'LG',model:'GLD235',type:'direct_cool'}
-  ];
   const response=await POST_LABEL(new Request('https://example.vercel.app/api/label',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({mime:'image/png',side:'old',image:Buffer.from('test-photo').toString('base64'),candidates})}));
+    body:JSON.stringify({mime:'image/png',side:'old',image:Buffer.from('test-photo').toString('base64')})}));
   const data=await response.json();
   assert.equal(response.status,200);
   assert.equal(data.details.annualUnits,null);
-  assert.deepEqual(data.suggestion,{index:1,basis:'brand_and_type'});
-  assert.match(payload.contents[0].parts[0].text,/GLD235/);
+  assert.equal(data.details.model,'');
+  assert.equal(data.suggestion,undefined);
+  assert.doesNotMatch(payload.contents[0].parts[0].text,/GLD235/);
 });
 
 test('Gemini key and quota failures are distinguishable from an unreadable photo',async t=>{

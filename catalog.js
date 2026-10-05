@@ -15,9 +15,10 @@
     const type = Object.keys(typeNames).find(name => normalize(typeNames[name]) === normalize(row.fridge_type));
     const kwh = Number(row.annual_kwh);
     if (!type || !row.brand || !row.model_number || !Number.isFinite(kwh) || kwh <= 0) return null;
+    const litres = row.total_volume_l == null || row.total_volume_l === '' ? null : Number(row.total_volume_l);
     return {
       brand: String(row.brand).trim(), model: String(row.model_number).trim(),
-      type, litres: null,
+      type, litres: Number.isFinite(litres) && litres > 0 ? litres : null,
       kwh, stars: row.stars == null ? null : Number(row.stars)
     };
   }
@@ -43,7 +44,7 @@
   async function search({ type, brand = '', model = '' }) {
     if (!typeNames[type]) return [];
     const params = new URLSearchParams({
-      select: 'brand,model_number,fridge_type,annual_kwh,stars',
+      select: 'brand,model_number,fridge_type,total_volume_l,annual_kwh,stars',
       fridge_type: 'eq.' + typeNames[type], order: 'brand.asc,model_number.asc', limit: '60'
     });
     if (searchValue(brand)) params.set('brand', 'ilike.*' + searchValue(brand) + '*');
@@ -51,12 +52,5 @@
     return fetchRows(params);
   }
 
-  function list() {
-    return fetchRows(new URLSearchParams({
-      select: 'brand,model_number,fridge_type,annual_kwh,stars',
-      order: 'brand.asc,model_number.asc', limit: '100'
-    }));
-  }
-
-  globalThis.UpgradeCatalog = { search, list };
+  globalThis.UpgradeCatalog = { search };
 })();

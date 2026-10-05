@@ -108,7 +108,7 @@
   <header><div class="wrap head"><span class="brand"><span class="mark" aria-hidden="true">uc</span>UpgradeCheck</span></div></header>
   <main id="top">
     <section class="calculator" aria-labelledby="title"><div class="wrap">
-      <div class="intro"><p class="eyebrow">Fridge electricity payback</p><h1 id="title">Will the fridge you want pay for itself?</h1><p>Upload one photo of each fridge. Gemini reads what it can identify, and UpgradeCheck checks for an exact model in our catalogue. Then see the comparison available from those details. <button class="sample" id="try-sample" type="button">Try a filled example</button> (illustrative figures)</p></div>
+      <div class="intro"><p class="eyebrow">Fridge electricity payback</p><h1 id="title">Will the fridge you want pay for itself?</h1><p>Upload one photo of each fridge. Gemini reads visible details, and UpgradeCheck searches for the exact model. If its model number is hidden, you can explore similar models from the catalogue as illustrations. <button class="sample" id="try-sample" type="button">Try a filled example</button> (illustrative figures)</p></div>
       <form id="check-form" novalidate>
         <div class="compare-grid">
           <section class="card compare-card" aria-labelledby="old-title">
@@ -118,7 +118,7 @@
               <label class="field">Photo of my current fridge (JPG, PNG or WebP; up to 2 MB)<input id="old-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
               <button class="subtle-button" id="old-read-label" type="button">Identify from photo with Gemini</button>
               <span class="small-status" id="old-photo-status" role="status"></span>
-              <div class="data-note" id="old-photo-review" hidden><p id="old-photo-preview"></p><p id="old-photo-suggestion" hidden></p><button class="subtle-button" id="old-use-photo" type="button">Use visible details</button> <button class="subtle-button" id="old-use-suggestion" type="button" hidden>Use suggestion as illustration</button> <button class="sample" id="old-dismiss-photo" type="button">Dismiss</button></div>
+              <div class="data-note" id="old-photo-review" hidden><p id="old-photo-preview"></p><p id="old-photo-suggestion" hidden></p><label class="field" id="old-photo-options-label" hidden>Choose a catalogue model to explore<select id="old-photo-options"><option value="">Choose a model</option></select></label><button class="subtle-button" id="old-use-photo" type="button">Use visible details</button> <button class="subtle-button" id="old-use-suggestion" type="button" hidden disabled>Use selected model as illustration</button> <button class="sample" id="old-dismiss-photo" type="button">Dismiss</button></div>
               <p class="photo-summary" id="old-identified">No photo details applied yet.</p>
             </div>
             <details class="manual-details"><summary>Review, search or enter fridge details manually</summary><div class="form-grid">
@@ -129,7 +129,7 @@
               <label class="field">Labelled annual units (kWh/year)<input id="old-units" name="oldUnits" type="number" min="1" max="5000" step="any" placeholder="Auto-filled for matches"></label>
             </div></details>
             <p class="source-line" id="old-source">Upload a photo and review what Gemini finds. Exact model or label units are needed for electricity payback.</p>
-            <p class="label-help">Only an exact model match or readable energy label can supply annual units. A visually similar fridge is not a substitute.</p>
+            <p class="label-help">Only an exact model match or readable energy label can supply annual units for your fridge. A similar model supports an illustrative scenario, not a verified payback.</p>
             <label class="field" style="margin-top:16px;font-weight:600"><input id="current-unusable" type="checkbox" style="display:inline;width:auto;min-height:unset;margin:0 7px 0 0;vertical-align:middle">I have to replace this fridge; keeping it is not an option</label>
           </section>
           <section class="card compare-card" aria-labelledby="new-title">
@@ -139,7 +139,7 @@
               <label class="field">Photo of the fridge I want (JPG, PNG or WebP; up to 2 MB)<input id="new-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
               <button class="subtle-button" id="new-read-label" type="button">Identify from photo with Gemini</button>
               <span class="small-status" id="new-photo-status" role="status"></span>
-              <div class="data-note" id="new-photo-review" hidden><p id="new-photo-preview"></p><p id="new-photo-suggestion" hidden></p><button class="subtle-button" id="new-use-photo" type="button">Use visible details</button> <button class="subtle-button" id="new-use-suggestion" type="button" hidden>Use suggestion as illustration</button> <button class="sample" id="new-dismiss-photo" type="button">Dismiss</button></div>
+              <div class="data-note" id="new-photo-review" hidden><p id="new-photo-preview"></p><p id="new-photo-suggestion" hidden></p><label class="field" id="new-photo-options-label" hidden>Choose a catalogue model to explore<select id="new-photo-options"><option value="">Choose a model</option></select></label><button class="subtle-button" id="new-use-photo" type="button">Use visible details</button> <button class="subtle-button" id="new-use-suggestion" type="button" hidden disabled>Use selected model as illustration</button> <button class="sample" id="new-dismiss-photo" type="button">Dismiss</button></div>
               <p class="photo-summary" id="new-identified">No photo details applied yet.</p>
             </div>
             <details class="manual-details"><summary>Review, search or enter fridge details manually</summary><div class="form-grid">

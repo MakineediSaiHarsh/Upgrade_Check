@@ -30,7 +30,6 @@ test('model-first page calculates locally and handles missing and cross-type mod
   ];
   let failCatalog = false;
   let photoDetails = { brand: 'LG', model: 'GL-B199OSLC', type: 'direct_cool', capacity: null, annualUnits: null };
-  let photoSuggestion = null;
   let photoFailure = false;
   let photoCalls = 0;
   let explainCalls = 0;
@@ -48,7 +47,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
       if (String(url).includes('/api/label')) {
         photoCalls++;
         return photoFailure ? { ok: false, status: 503, json: async () => ({ error: 'Google denied Gemini API access for this key or project (HTTP 403). Check its status and restrictions in Google AI Studio.' }) } :
-          { ok: true, json: async () => ({ details: photoDetails, suggestion: photoSuggestion }) };
+          { ok: true, json: async () => ({ details: photoDetails }) };
       }
       if (String(url).includes('/api/check')) {
         explainCalls++;
@@ -130,7 +129,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   await new Promise(resolve => setTimeout(resolve, 300));
   assert.ok(queries.length > 0);
   assert.ok(queries.every(q => q.parsed.hostname.endsWith('.supabase.co') && q.options.headers.apikey.startsWith('sb_publishable_')));
-  assert.ok(queries.every(q => q.parsed.searchParams.get('select') === 'brand,model_number,fridge_type,annual_kwh,stars'));
+  assert.ok(queries.every(q => q.parsed.searchParams.get('select') === 'brand,model_number,fridge_type,total_volume_l,annual_kwh,stars'));
   assert.equal(elements['new-units'].value, '240');
   assert.match(elements['new-source'].textContent, /Catalogue match/);
   elements['new-units'].value = '240';
@@ -161,6 +160,11 @@ test('model-first page calculates locally and handles missing and cross-type mod
 
   photoDetails = { brand: 'LG', model: '', type: 'direct_cool', capacity: null, annualUnits: null };
   await elements['old-read-label'].listeners.click();
+  assert.equal(elements['old-model'].value, 'GL-B199OSLC');
+  assert.equal(elements['old-capacity'].value, '185');
+  assert.equal(elements['old-units'].value, '190');
+  assert.match(elements['old-source'].textContent, /Illustrative catalogue match/);
+  assert.match(elements['old-photo-suggestion'].textContent, /prefilled a representative/);
   elements['old-use-photo'].listeners.click();
   assert.equal(elements['old-model'].value, '');
   assert.equal(elements['old-units'].value, '');
@@ -169,15 +173,23 @@ test('model-first page calculates locally and handles missing and cross-type mod
   assert.equal(photoCalls, 2);
   assert.equal(stored.get('upgradecheck_ai_attempts_v3'), '2');
   assert.match(elements['ai-remaining'].textContent, /3 of 5/);
-  photoSuggestion = {index:1,basis:'brand_and_type'};
+  photoDetails = { ...photoDetails, capacity: 224 };
   await elements['old-read-label'].listeners.click();
-  assert.equal(elements['old-units'].value, '');
   assert.equal(elements['old-use-suggestion'].hidden, false);
-  assert.match(elements['old-photo-suggestion'].textContent, /illustrative proxy/);
+  assert.equal(elements['old-model'].value, 'GLD235');
+  assert.equal(elements['old-capacity'].value, '224');
+  assert.equal(elements['old-units'].value, '118');
+  elements['old-photo-options'].value = '0';
+  elements['old-photo-options'].listeners.change();
+  elements['old-use-suggestion'].listeners.click();
+  assert.equal(elements['old-model'].value, 'GL-B199OSLC');
+  elements['old-photo-options'].value = '1';
+  elements['old-photo-options'].listeners.change();
   elements['old-use-suggestion'].listeners.click();
   assert.equal(elements['old-model'].value, 'GLD235');
+  assert.equal(elements['old-capacity'].value, '224');
   assert.equal(elements['old-units'].value, '118');
-  assert.match(elements['old-source'].textContent, /Illustrative proxy/);
+  assert.match(elements['old-source'].textContent, /Illustrative catalogue match/);
   assert.match(elements['result-basis'].textContent, /payback is not a reliable forecast/);
   assert.equal(elements['units-label'].textContent, 'Illustrative annual use difference');
   await elements['explain-button'].listeners.click();
