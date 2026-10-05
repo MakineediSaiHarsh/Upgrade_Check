@@ -30,6 +30,8 @@ test('model-first page calculates locally and handles missing and cross-type mod
   ];
   let failCatalog = false;
   let photoDetails = { brand: 'LG', model: 'GL-B199OSLC', type: 'direct_cool', capacity: null, annualUnits: null };
+  let photoSuggestion = null;
+  let photoFailure = false;
   let photoCalls = 0;
   let explainCalls = 0;
   const stored = new Map();
@@ -43,7 +45,11 @@ test('model-first page calculates locally and handles missing and cross-type mod
       readAsDataURL() { this.result = 'data:image/png;base64,dGVzdA=='; this.onload(); }
     },
     fetch: async (url, options) => {
-      if (String(url).includes('/api/label')) { photoCalls++; return { ok: true, json: async () => ({ details: photoDetails }) }; }
+      if (String(url).includes('/api/label')) {
+        photoCalls++;
+        return photoFailure ? { ok: false, status: 503, json: async () => ({ error: 'Gemini rejected the API key. Check GEMINI_API_KEY in Vercel.' }) } :
+          { ok: true, json: async () => ({ details: photoDetails, suggestion: photoSuggestion }) };
+      }
       if (String(url).includes('/api/check')) {
         explainCalls++;
         return { ok: true, json: async () => ({ answer: { summary: 'Scenario', caveat: 'Check labels', next_step: 'Compare costs' } }) };
@@ -52,7 +58,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
       queries.push({ parsed, options });
       if (failCatalog) throw new TypeError('Failed to fetch');
       const params = parsed.searchParams;
-      const matches = rows.filter(row => row.fridge_type === params.get('fridge_type').slice(3) &&
+      const matches = rows.filter(row => (!params.has('fridge_type') || row.fridge_type === params.get('fridge_type').slice(3)) &&
         (!params.has('brand') || row.brand.toLowerCase().includes(params.get('brand').slice(7, -1).toLowerCase())) &&
         (!params.has('model_number') || row.model_number.toLowerCase().includes(params.get('model_number').slice(7, -1).toLowerCase())));
       return { ok: true, json: async () => matches };
@@ -161,12 +167,23 @@ test('model-first page calculates locally and handles missing and cross-type mod
   assert.match(elements['old-source'].textContent, /exact model or annual units were not visible/);
   assert.match(elements['old-identified'].textContent, /annual units unknown/);
   assert.equal(photoCalls, 2);
-  assert.equal(stored.get('upgradecheck_ai_attempts_v1'), '2');
+  assert.equal(stored.get('upgradecheck_ai_attempts_v2'), '2');
   assert.match(elements['ai-remaining'].textContent, /3 of 5/);
+  photoSuggestion = {index:1,basis:'brand_and_type'};
+  await elements['old-read-label'].listeners.click();
+  assert.equal(elements['old-units'].value, '');
+  assert.equal(elements['old-use-suggestion'].hidden, false);
+  assert.match(elements['old-photo-suggestion'].textContent, /illustrative proxy/);
+  elements['old-use-suggestion'].listeners.click();
+  assert.equal(elements['old-model'].value, 'GLD235');
+  assert.equal(elements['old-units'].value, '118');
+  assert.match(elements['old-source'].textContent, /Illustrative proxy/);
+  assert.match(elements['result-basis'].textContent, /payback is not a reliable forecast/);
+  assert.equal(elements['units-label'].textContent, 'Illustrative annual use difference');
   await elements['explain-button'].listeners.click();
   assert.equal(explainCalls, 1);
-  assert.match(elements['ai-remaining'].textContent, /2 of 5/);
-  for (let i = 0; i < 2; i++) await elements['old-read-label'].listeners.click();
+  assert.match(elements['ai-remaining'].textContent, /1 of 5/);
+  await elements['old-read-label'].listeners.click();
   assert.equal(photoCalls, 4);
   assert.match(elements['ai-remaining'].textContent, /0 of 5/);
   await elements['old-read-label'].listeners.click();
@@ -175,4 +192,9 @@ test('model-first page calculates locally and handles missing and cross-type mod
   await elements['explain-button'].listeners.click();
   assert.equal(explainCalls, 1);
   assert.match(elements['ai-message'].textContent, /used five AI attempts/);
+  stored.set('upgradecheck_ai_attempts_v2', '0');
+  photoFailure = true;
+  await elements['old-read-label'].listeners.click();
+  assert.equal(stored.get('upgradecheck_ai_attempts_v2'), '0');
+  assert.equal(elements['old-photo-status'].textContent, 'Gemini rejected the API key. Check GEMINI_API_KEY in Vercel.');
 });

@@ -22,15 +22,7 @@
     };
   }
 
-  async function search({ type, brand = '', model = '' }) {
-    if (!typeNames[type]) return [];
-    const params = new URLSearchParams({
-      // These are the columns confirmed by the working PowerShell API request.
-      select: 'brand,model_number,fridge_type,annual_kwh,stars',
-      fridge_type: 'eq.' + typeNames[type], order: 'brand.asc,model_number.asc', limit: '60'
-    });
-    if (searchValue(brand)) params.set('brand', 'ilike.*' + searchValue(brand) + '*');
-    if (searchValue(model)) params.set('model_number', 'ilike.*' + searchValue(model) + '*');
+  async function fetchRows(params) {
     const response = await fetch(url + '/rest/v1/refrigerator_models?' + params, {
       headers: { apikey: key }, cache: 'no-store'
     });
@@ -48,5 +40,23 @@
     return rows.map(mapRow).filter(Boolean);
   }
 
-  globalThis.UpgradeCatalog = { search };
+  async function search({ type, brand = '', model = '' }) {
+    if (!typeNames[type]) return [];
+    const params = new URLSearchParams({
+      select: 'brand,model_number,fridge_type,annual_kwh,stars',
+      fridge_type: 'eq.' + typeNames[type], order: 'brand.asc,model_number.asc', limit: '60'
+    });
+    if (searchValue(brand)) params.set('brand', 'ilike.*' + searchValue(brand) + '*');
+    if (searchValue(model)) params.set('model_number', 'ilike.*' + searchValue(model) + '*');
+    return fetchRows(params);
+  }
+
+  function list() {
+    return fetchRows(new URLSearchParams({
+      select: 'brand,model_number,fridge_type,annual_kwh,stars',
+      order: 'brand.asc,model_number.asc', limit: '100'
+    }));
+  }
+
+  globalThis.UpgradeCatalog = { search, list };
 })();

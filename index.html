@@ -118,7 +118,7 @@
               <label class="field">Photo of my current fridge (JPG, PNG or WebP; up to 2 MB)<input id="old-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
               <button class="subtle-button" id="old-read-label" type="button">Identify from photo with Gemini</button>
               <span class="small-status" id="old-photo-status" role="status"></span>
-              <div class="data-note" id="old-photo-review" hidden><p id="old-photo-preview"></p><button class="subtle-button" id="old-use-photo" type="button">Use these details</button> <button class="sample" id="old-dismiss-photo" type="button">Dismiss</button></div>
+              <div class="data-note" id="old-photo-review" hidden><p id="old-photo-preview"></p><p id="old-photo-suggestion" hidden></p><button class="subtle-button" id="old-use-photo" type="button">Use visible details</button> <button class="subtle-button" id="old-use-suggestion" type="button" hidden>Use suggestion as illustration</button> <button class="sample" id="old-dismiss-photo" type="button">Dismiss</button></div>
               <p class="photo-summary" id="old-identified">No photo details applied yet.</p>
             </div>
             <details class="manual-details"><summary>Review, search or enter fridge details manually</summary><div class="form-grid">
@@ -139,7 +139,7 @@
               <label class="field">Photo of the fridge I want (JPG, PNG or WebP; up to 2 MB)<input id="new-label-photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
               <button class="subtle-button" id="new-read-label" type="button">Identify from photo with Gemini</button>
               <span class="small-status" id="new-photo-status" role="status"></span>
-              <div class="data-note" id="new-photo-review" hidden><p id="new-photo-preview"></p><button class="subtle-button" id="new-use-photo" type="button">Use these details</button> <button class="sample" id="new-dismiss-photo" type="button">Dismiss</button></div>
+              <div class="data-note" id="new-photo-review" hidden><p id="new-photo-preview"></p><p id="new-photo-suggestion" hidden></p><button class="subtle-button" id="new-use-photo" type="button">Use visible details</button> <button class="subtle-button" id="new-use-suggestion" type="button" hidden>Use suggestion as illustration</button> <button class="sample" id="new-dismiss-photo" type="button">Dismiss</button></div>
               <p class="photo-summary" id="new-identified">No photo details applied yet.</p>
             </div>
             <details class="manual-details"><summary>Review, search or enter fridge details manually</summary><div class="form-grid">
@@ -174,7 +174,7 @@
         <p id="form-message" class="message" role="status" hidden></p>
         <div id="result-content" hidden>
           <div class="metrics">
-            <div class="metric"><span>Labelled annual use difference</span><strong id="units-result"></strong></div>
+            <div class="metric"><span id="units-label">Labelled annual use difference</span><strong id="units-result"></strong></div>
             <div class="metric"><span>Annual bill difference</span><strong id="saving-result"></strong></div>
             <div class="metric"><span>At five years</span><strong id="milestone-result"></strong></div>
           </div>

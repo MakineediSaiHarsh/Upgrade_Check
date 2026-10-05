@@ -50,6 +50,8 @@ test('input validation and model output guardrails reject unsupported claims',()
   assert.throws(()=>parseInput({...base,oldUnits:'400'}),/Check/);
   assert.throws(()=>parseInput({...base,newPrice:10000,tradeIn:20000}),/Check/);
   assert.match(SYSTEM_PROMPT,/explicitly refuse/);
+  assert.match(SYSTEM_PROMPT,/source of proxy/);
+  assert.equal(parseInput({...base,oldSource:'proxy'}).oldSource,'proxy');
   assert.throws(()=>safeModelOutput(JSON.stringify({summary:'UpgradeCheck is officially BEE certified.',caveat:'x',next_step:'x'})),/unsupported/);
   assert.doesNotThrow(()=>safeModelOutput(JSON.stringify({summary:'This is a label scenario.',caveat:'UpgradeCheck is not BEE endorsed.',next_step:'Check your label.'})));
 });
@@ -106,5 +108,52 @@ test('label reading returns reviewable fields without contacting Supabase',async
   assert.equal(parseLabel(JSON.stringify({brand:'',model:'',type:'',capacity:'',annualUnits:'5 stars'})).annualUnits,null);
   assert.deepEqual(parseLabel(JSON.stringify({brand:'LG',model:'',type:'direct_cool',capacity:'',annualUnits:''})),
     {brand:'LG',model:'',type:'direct_cool',capacity:null,annualUnits:null});
-  assert.match(JSON.parse(calls[0].options.body).systemInstruction.parts[0].text,/never infer an exact model from an exterior design/i);
+  assert.match(JSON.parse(calls[0].options.body).systemInstruction.parts[0].text,/model number must be legible in the photo, never inferred from exterior design/i);
+});
+
+test('photo route suggests a catalogue proxy but never inserts its annual units as a visible label reading',async t=>{
+  const oldFetch=globalThis.fetch;const oldEnv={...process.env};
+  t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
+  process.env.GEMINI_API_KEY='test-secret';
+  let payload;
+  globalThis.fetch=async(url,options)=>{
+    assert.match(url,/generativelanguage/);
+    payload=JSON.parse(options.body);
+    return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({
+      brand:'LG',model:'',type:'direct_cool',capacity:'',annualUnits:'',candidateIndex:1
+    })}]}}]});
+  };
+  const candidates=[
+    {brand:'LG',model:'GL-B199OSLC',type:'direct_cool'},
+    {brand:'LG',model:'GLD235',type:'direct_cool'}
+  ];
+  const response=await POST_LABEL(new Request('https://example.vercel.app/api/label',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mime:'image/png',side:'old',image:Buffer.from('test-photo').toString('base64'),candidates})}));
+  const data=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(data.details.annualUnits,null);
+  assert.deepEqual(data.suggestion,{index:1,basis:'brand_and_type'});
+  assert.match(payload.contents[0].parts[0].text,/GLD235/);
+});
+
+test('Gemini key and quota failures are distinguishable from an unreadable photo',async t=>{
+  const oldFetch=globalThis.fetch;const oldEnv={...process.env};
+  t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
+  process.env.GEMINI_API_KEY='test-secret';
+  const request=(candidates=[])=>new Request('https://example.vercel.app/api/label',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mime:'image/png',side:'old',image:Buffer.from('test-photo').toString('base64'),candidates})});
+  globalThis.fetch=async()=>new Response(null,{status:403});
+  const invalid=await POST_LABEL(request());
+  assert.equal(invalid.status,503);
+  assert.match((await invalid.json()).error,/API key.*Vercel/);
+  globalThis.fetch=async()=>new Response(null,{status:429});
+  const quota=await POST_LABEL(request());
+  assert.equal(quota.status,429);
+  assert.match((await quota.json()).error,/quota/);
+  globalThis.fetch=async()=>Response.json({candidates:[{content:{parts:[{text:JSON.stringify({
+    brand:'',model:'',type:'',capacity:'',annualUnits:'',candidateIndex:0
+  })}]}}]});
+  const noClues=await POST_LABEL(request([{brand:'LG',model:'GLD235',type:'direct_cool'}]));
+  assert.equal(noClues.status,422);
+  assert.match((await noClues.json()).error,/did not show a recognizable/);
 });
