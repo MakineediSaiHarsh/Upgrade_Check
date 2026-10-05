@@ -36,7 +36,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
       if (String(url).includes('/api/stats')) return { ok: false };
       const parsed = new URL(url);
       queries.push({ parsed, options });
-      if (failCatalog) throw new Error('offline');
+      if (failCatalog) throw new TypeError('Failed to fetch');
       const params = parsed.searchParams;
       const matches = rows.filter(row => row.fridge_type === params.get('fridge_type').slice(3) &&
         (!params.has('brand') || row.brand.toLowerCase().includes(params.get('brand').slice(7, -1).toLowerCase())) &&
@@ -53,6 +53,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   await elements['try-sample'].listeners.click();
   assert.equal(queries.length, 2);
   assert.ok(queries.every(q => q.parsed.hostname.endsWith('.supabase.co') && q.options.headers.apikey.startsWith('sb_publishable_')));
+  assert.ok(queries.every(q => q.parsed.searchParams.get('select') === 'brand,model_number,fridge_type,annual_kwh,stars'));
   assert.equal(elements['old-type'].value, 'direct_cool');
   assert.equal(elements['old-brand'].value, 'LG');
   assert.equal(elements['old-model'].value, 'GL-B199OSLC');
@@ -114,7 +115,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   elements['old-model'].value = 'No such fridge';
   elements['old-model'].listeners.input();
   await new Promise(resolve => setTimeout(resolve, 300));
-  assert.match(elements['old-source'].textContent, /Model search is unavailable/);
+  assert.match(elements['old-source'].textContent, /Could not connect to Supabase/);
   elements['old-units'].value = '210';
   elements['old-units'].listeners.input();
   assert.equal(elements['old-units'].value, '210');

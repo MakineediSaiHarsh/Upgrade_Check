@@ -78,18 +78,19 @@
         if (match.litres > 0) field(side, 'capacity').value = String(match.litres);
         field(side, 'units').value = String(match.kwh);
         field(side, 'source').textContent = 'Catalogue match: ' + match.brand + ' ' + match.model + ', ' + match.kwh +
-          ' units/year' + (match.stars ? ', ' + match.stars + ' stars' : '') +
-          '. ' + (match.status === 'provisional' ? 'Provisional entry; ' : '') + 'Check your exact BEE label.';
+          ' units/year' + (match.stars ? ', ' + match.stars + ' stars' : '') + '. Check your exact BEE label.';
         render();
       } else {
         field(side, 'source').textContent = rows.length ?
           (model ? 'Select an exact model suggestion, or enter its annual units from the label.' : 'Start typing a model number, or enter annual units manually.') :
           'No catalogue match found. Enter the annual units from this fridge’s label.';
       }
-    } catch {
+    } catch (error) {
       if (version !== searchVersions[side]) return;
       refreshModels(side);
-      field(side, 'source').textContent = 'Model search is unavailable. Enter annual units from your fridge’s label; the calculator still works.';
+      field(side, 'source').textContent = (error && error.name === 'TypeError' ?
+        'Could not connect to Supabase from this browser. Check the project URL and network access.' :
+        error.message || 'Model search is unavailable.') + ' You can still enter the annual units from the label.';
     }
   }
 
