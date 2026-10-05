@@ -3,10 +3,36 @@ import assert from 'node:assert/strict';
 import { parseInput, compare, safeModelOutput, SYSTEM_PROMPT } from '../lib/decision.js';
 import { POST } from '../api/check.js';
 import { POST as POST_LABEL, parseLabel } from '../api/label.js';
+import { GET as GET_STATS } from '../api/stats.js';
+import { GET as GET_MODELS } from '../api/models.js';
 import { geminiFailure } from '../lib/server.js';
 import '../payback.js';
 
 const base={oldModel:'Old fridge',newModel:'Preferred fridge',oldUnits:400,newUnits:120,newPrice:25000,tradeIn:0,rateLow:7,rateHigh:10,concern:''};
+
+function mockDatabase(next, records = []) {
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_SERVICE_KEY = 'sb_secret_test';
+  return async (url, options = {}) => {
+    if (!String(url).includes('.supabase.co/rest/v1/')) return next(url, options);
+    assert.equal(options.headers.apikey, 'sb_secret_test');
+    assert.equal(options.headers.Authorization, undefined);
+    if (String(url).includes('/gemini_calls')) {
+      if (options.method === 'POST') {
+        const row = { id: '00000000-0000-4000-8000-' + String(records.length + 1).padStart(12, '0'), ...JSON.parse(options.body) };
+        records.push(row);
+        return Response.json([{ id: row.id }]);
+      }
+      if (options.method === 'PATCH') {
+        const row = records.find(r => url.endsWith('eq.' + r.id));
+        Object.assign(row, JSON.parse(options.body));
+        return new Response(null, { status: 204 });
+      }
+      if (options.method === 'HEAD') return new Response(null, { status: 200, headers: { 'Content-Range': '0-0/' + records.length } });
+    }
+    return next(url, options);
+  };
+}
 
 test('the selected fridges produce a payback range from energy savings and price',()=>{
   const result=compare(parseInput(base));
@@ -57,23 +83,28 @@ test('input validation and model output guardrails reject unsupported claims',()
   assert.doesNotThrow(()=>safeModelOutput(JSON.stringify({summary:'This is a label scenario.',caveat:'UpgradeCheck is not BEE endorsed.',next_step:'Check your label.'})));
 });
 
-test('AI route uses the Gemini key without any Supabase request',async t=>{
+test('AI route records one call with measured tokens and keeps secrets server-side',async t=>{
   const oldFetch=globalThis.fetch;const oldEnv={...process.env};
   t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
   process.env.GEMINI_API_KEY='test-secret';
-  delete process.env.SUPABASE_URL;
-  delete process.env.SUPABASE_SERVICE_KEY;
   const calls=[];
-  globalThis.fetch=async(url,options)=>{
+  const records=[];
+  globalThis.fetch=mockDatabase(async(url,options)=>{
     calls.push({url,options});
     if(url.includes('generativelanguage'))return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({summary:'The selected labels imply savings.',caveat:'Actual home use may differ.',next_step:'Confirm both labels.'})}]}}],usageMetadata:{promptTokenCount:92,candidatesTokenCount:38}});
     throw new Error(`Unexpected URL: ${url}`);
-  };
+  },records);
   const response=await POST(new Request('https://example.vercel.app/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)}));
   const data=await response.json();
   assert.equal(response.status,200);
   assert.equal(data.figures.annualUnitsSaved,280);
   assert.equal(calls.length,1);
+  assert.equal(records.length,1);
+  assert.equal(records[0].status,'success');
+  assert.equal(records[0].feature,'result_explanation');
+  assert.equal(records[0].input_tokens,92);
+  assert.equal(records[0].output_tokens,38);
+  assert.equal((await (await GET_STATS()).json()).recordedCalls,1);
   assert.match(calls[0].url,/models\/gemini-3\.5-flash-lite:generateContent/);
   assert.equal(calls[0].options.headers['x-goog-api-key'],'test-secret');
   const payload=JSON.parse(calls[0].options.body);
@@ -95,16 +126,17 @@ test('missing Gemini configuration prevents an external call',async t=>{
   assert.equal(calls,0);
 });
 
-test('label reading returns reviewable fields without contacting Supabase',async t=>{
+test('label reading logs metadata and extracted details without photo bytes',async t=>{
   const oldFetch=globalThis.fetch;const oldEnv={...process.env};
   t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
-  process.env.GEMINI_API_KEY='test-secret';delete process.env.SUPABASE_URL;delete process.env.SUPABASE_SERVICE_KEY;
+  process.env.GEMINI_API_KEY='test-secret';
   const calls=[];
-  globalThis.fetch=async(url,options)=>{
+  const records=[];
+  globalThis.fetch=mockDatabase(async(url,options)=>{
     calls.push({url,options});
     if(url.includes('generativelanguage'))return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({brand:'LG',model:'GLD235',type:'direct_cool',capacity:'224',annualUnits:'118'})}]}}],usageMetadata:{promptTokenCount:300,candidatesTokenCount:40}});
     throw new Error('Unexpected '+url);
-  };
+  },records);
   const photo=Buffer.from('test-photo').toString('base64');
   const response=await POST_LABEL(new Request('https://example.vercel.app/api/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mime:'image/png',side:'old',image:photo})}));
   const data=await response.json();
@@ -112,6 +144,11 @@ test('label reading returns reviewable fields without contacting Supabase',async
   assert.equal(data.details.annualUnits,118);
   assert.equal(data.details.type,'direct_cool');
   assert.equal(calls.length,1);
+  assert.equal(records[0].status,'success');
+  assert.equal(records[0].feature,'photo_identification');
+  assert.equal(records[0].input_tokens,300);
+  assert.equal(records[0].response_summary.details.annualUnits,118);
+  assert.doesNotMatch(JSON.stringify(records[0]),/dGVzdC1waG90bw==/);
   assert.match(calls[0].url,/models\/gemini-3\.5-flash-lite:generateContent/);
   assert.equal(calls[0].options.headers['x-goog-api-key'],'test-secret');
   assert.deepEqual(JSON.parse(calls[0].options.body).generationConfig.thinkingConfig,{thinkingLevel:'minimal'});
@@ -126,13 +163,13 @@ test('photo route returns visible details without inventing a model from catalog
   t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
   process.env.GEMINI_API_KEY='test-secret';
   let payload;
-  globalThis.fetch=async(url,options)=>{
+  globalThis.fetch=mockDatabase(async(url,options)=>{
     assert.match(url,/generativelanguage/);
     payload=JSON.parse(options.body);
     return Response.json({candidates:[{content:{parts:[{text:JSON.stringify({
       brand:'LG',model:'',type:'direct_cool',capacity:'',annualUnits:''
     })}]}}]});
-  };
+  });
   const response=await POST_LABEL(new Request('https://example.vercel.app/api/label',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({mime:'image/png',side:'old',image:Buffer.from('test-photo').toString('base64')})}));
   const data=await response.json();
@@ -149,24 +186,24 @@ test('Gemini key and quota failures are distinguishable from an unreadable photo
   process.env.GEMINI_API_KEY='test-secret';
   const request=(candidates=[])=>new Request('https://example.vercel.app/api/label',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({mime:'image/png',side:'old',image:Buffer.from('test-photo').toString('base64'),candidates})});
-  globalThis.fetch=async()=>new Response(null,{status:403});
+  globalThis.fetch=mockDatabase(async()=>new Response(null,{status:403}));
   const invalid=await POST_LABEL(request());
   assert.equal(invalid.status,503);
   assert.match((await invalid.json()).error,/denied Gemini API access.*403/);
-  globalThis.fetch=async()=>new Response(null,{status:404});
+  globalThis.fetch=mockDatabase(async()=>new Response(null,{status:404}));
   const unavailable=await POST_LABEL(request());
   assert.equal(unavailable.status,503);
   assert.match((await unavailable.json()).error,/model is not available.*404/);
   const checkUnavailable=await POST(new Request('https://example.vercel.app/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)}));
   assert.equal(checkUnavailable.status,503);
   assert.match((await checkUnavailable.json()).error,/model is not available.*404/);
-  globalThis.fetch=async()=>new Response(null,{status:429});
+  globalThis.fetch=mockDatabase(async()=>new Response(null,{status:429}));
   const quota=await POST_LABEL(request());
   assert.equal(quota.status,429);
   assert.match((await quota.json()).error,/quota/);
-  globalThis.fetch=async()=>Response.json({candidates:[{content:{parts:[{text:JSON.stringify({
+  globalThis.fetch=mockDatabase(async()=>Response.json({candidates:[{content:{parts:[{text:JSON.stringify({
     brand:'',model:'',type:'',capacity:'',annualUnits:'',candidateIndex:0
-  })}]}}]});
+  })}]}}]}));
   const noClues=await POST_LABEL(request([{brand:'LG',model:'GLD235',type:'direct_cool'}]));
   assert.equal(noClues.status,422);
   assert.match((await noClues.json()).error,/did not show a recognizable/);
@@ -185,4 +222,38 @@ test('Gemini permission errors report a safe cause without returning upstream te
   assert.match(invalid.error,/key or project/);
   const unrestricted=await geminiFailure(upstream('Unrestricted standard key is not permitted.'));
   assert.match(unrestricted.error,/unrestricted standard key/);
+});
+
+test('model proxy restricts query and never returns the database key',async t=>{
+  const oldFetch=globalThis.fetch;const oldEnv={...process.env};
+  t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
+  process.env.SUPABASE_URL='https://example.supabase.co';
+  process.env.SUPABASE_SERVICE_KEY='sb_secret_test';
+  let calledUrl;
+  globalThis.fetch=async(url,options)=>{
+    calledUrl=new URL(url);
+    assert.equal(options.headers.apikey,'sb_secret_test');
+    return Response.json([{brand:'LG',model_number:'GLD235',fridge_type:'Direct Cool',annual_kwh:118}]);
+  };
+  const invalid=await GET_MODELS(new Request('https://site.test/api/models?type=other'));
+  assert.equal(invalid.status,400);
+  const valid=await GET_MODELS(new Request('https://site.test/api/models?type=direct_cool&brand=LG&model=GLD235'));
+  assert.equal(valid.status,200);
+  assert.equal((await valid.json())[0].model_number,'GLD235');
+  assert.equal(calledUrl.searchParams.get('limit'),'60');
+  assert.equal(calledUrl.searchParams.get('brand'),'ilike.*LG*');
+});
+
+test('Gemini is not called if the database cannot create its audit row',async t=>{
+  const oldFetch=globalThis.fetch;const oldEnv={...process.env};
+  t.after(()=>{globalThis.fetch=oldFetch;process.env=oldEnv;});
+  process.env.GEMINI_API_KEY='test-secret';
+  process.env.SUPABASE_URL='https://example.supabase.co';
+  process.env.SUPABASE_SERVICE_KEY='sb_secret_test';
+  let calls=0;
+  globalThis.fetch=async url=>{calls++;assert.match(url,/supabase\.co/);return new Response(null,{status:503});};
+  const response=await POST(new Request('https://site.test/api/check',{method:'POST',body:JSON.stringify(base)}));
+  assert.equal(response.status,503);
+  assert.match((await response.json()).error,/AI logging is unavailable/);
+  assert.equal(calls,1);
 });

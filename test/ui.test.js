@@ -35,6 +35,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   let explainCalls = 0;
   const stored = new Map();
   const queries = [];
+  let recordedCalls = 0;
   const context = {
     Intl, Number, String, Math, console, URLSearchParams, setTimeout, clearTimeout,
     location: { protocol: 'https:' },
@@ -44,22 +45,26 @@ test('model-first page calculates locally and handles missing and cross-type mod
       readAsDataURL() { this.result = 'data:image/png;base64,dGVzdA=='; this.onload(); }
     },
     fetch: async (url, options) => {
+      if (String(url).includes('/api/stats')) return { ok: true, json: async () => ({ recordedCalls }) };
       if (String(url).includes('/api/label')) {
         photoCalls++;
+        recordedCalls++;
         return photoFailure ? { ok: false, status: 503, json: async () => ({ error: 'Google denied Gemini API access for this key or project (HTTP 403). Check its status and restrictions in Google AI Studio.' }) } :
           { ok: true, json: async () => ({ details: photoDetails }) };
       }
       if (String(url).includes('/api/check')) {
         explainCalls++;
+        recordedCalls++;
         return { ok: true, json: async () => ({ answer: { summary: 'Scenario', caveat: 'Check labels', next_step: 'Compare costs' } }) };
       }
-      const parsed = new URL(url);
+      const parsed = new URL(url, 'https://site.test');
       queries.push({ parsed, options });
       if (failCatalog) throw new TypeError('Failed to fetch');
       const params = parsed.searchParams;
-      const matches = rows.filter(row => (!params.has('fridge_type') || row.fridge_type === params.get('fridge_type').slice(3)) &&
-        (!params.has('brand') || row.brand.toLowerCase().includes(params.get('brand').slice(7, -1).toLowerCase())) &&
-        (!params.has('model_number') || row.model_number.toLowerCase().includes(params.get('model_number').slice(7, -1).toLowerCase())));
+      const typeNames = { direct_cool: 'Direct Cool', frost_free: 'Frost Free' };
+      const matches = rows.filter(row => (!params.has('type') || row.fridge_type === typeNames[params.get('type')]) &&
+        (!params.has('brand') || row.brand.toLowerCase().includes(params.get('brand').toLowerCase())) &&
+        (!params.has('model') || row.model_number.toLowerCase().includes(params.get('model').toLowerCase())));
       return { ok: true, json: async () => matches };
     },
     document: { getElementById: id => elements[id], createElement: () => ({ value: '', label: '' }) }
@@ -128,8 +133,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   elements['new-model'].listeners.input();
   await new Promise(resolve => setTimeout(resolve, 300));
   assert.ok(queries.length > 0);
-  assert.ok(queries.every(q => q.parsed.hostname.endsWith('.supabase.co') && q.options.headers.apikey.startsWith('sb_publishable_')));
-  assert.ok(queries.every(q => q.parsed.searchParams.get('select') === 'brand,model_number,fridge_type,total_volume_l,annual_kwh,stars'));
+  assert.ok(queries.every(q => q.parsed.pathname === '/api/models' && !q.options.headers?.apikey));
   assert.equal(elements['new-units'].value, '240');
   assert.match(elements['new-source'].textContent, /Catalogue match/);
   elements['new-units'].value = '240';
@@ -141,7 +145,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   elements['old-model'].value = 'No such fridge';
   elements['old-model'].listeners.input();
   await new Promise(resolve => setTimeout(resolve, 300));
-  assert.match(elements['old-source'].textContent, /Could not connect to Supabase/);
+  assert.match(elements['old-source'].textContent, /Could not reach model search/);
   elements['old-units'].value = '210';
   elements['old-units'].listeners.input();
   assert.equal(elements['old-units'].value, '210');
@@ -194,6 +198,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   assert.equal(elements['units-label'].textContent, 'Illustrative annual use difference');
   await elements['explain-button'].listeners.click();
   assert.equal(explainCalls, 1);
+  assert.match(elements['gemini-call-count'].textContent, /Gemini requests recorded: 4/);
   assert.match(elements['ai-remaining'].textContent, /1 of 5/);
   await elements['old-read-label'].listeners.click();
   assert.equal(photoCalls, 4);

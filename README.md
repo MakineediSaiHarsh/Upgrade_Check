@@ -5,10 +5,11 @@ This is the **calculator-only** website for the separate calculator repository a
 ~~~text
 index.html        Calculator at /
 app.js            Photo-first calculator interactions
-catalog.js        Read-only Supabase refrigerator search
+catalog.js        Browser catalogue search through /api/models
 payback.js        Local payback calculation
-api/              Optional Gemini functions at /api/*
+api/              Gemini, model search and count functions at /api/*
 lib/              Server-only logic
+supabase/          SQL for the Gemini call table
 test/             Automated tests
 ~~~
 
@@ -16,8 +17,10 @@ test/             Automated tests
 
 1. Extract this ZIP. Copy **its contents**, not the enclosing folder, into the root of your separate calculator GitHub repository. The root must contain `index.html`, `app.js`, `catalog.js`, `payback.js`, `api/`, and `lib/`.
 2. If that repository already contains an old landing page or duplicate `calculator/` and `assets/` directories from a combined version, remove those obsolete files after checking that the new root calculator is in place.
-3. Commit and push to `main`. In the calculator Vercel project, use the calculator repository with **Root Directory** at the repository root. The project homepage `/` will show the calculator.
-4. Test the new homepage and search `LG GLD235`. Its annual units should fill in from Supabase. The previous `/calculator/index.html` path is no longer part of this project.
+3. Run `supabase/gemini_calls.sql` in your project's Supabase SQL Editor. Keep the existing `public.refrigerator_models` table.
+4. In the **calculator** Vercel project's Production environment, set `GEMINI_API_KEY`, `SUPABASE_URL` (the project URL) and `SUPABASE_SERVICE_KEY` (prefer a current `sb_secret_...` key from Supabase API Keys; a legacy service-role JWT is also supported). Never use a publishable or anon key for `SUPABASE_SERVICE_KEY`. Enter raw values with no surrounding quotes.
+5. Commit and push to `main`. In the calculator Vercel project, use the calculator repository with **Root Directory** at the repository root. Redeploy after adding or changing environment variables. The homepage `/` will show the calculator.
+6. Open `/api/stats`; it should return `{"recordedCalls":0}` on a new table. Search `LG GLD235` and check that annual units populate. Use one photo or explanation, then refresh `/api/stats`: its count should increase by one. The previous `/calculator/index.html` path is no longer part of this project.
 
 Keep your separately deployed landing page in its own repository. If it has a “Compare my fridges” button, point that button to this calculator project's public URL.
 
@@ -29,11 +32,13 @@ The initial imported rows are a selected Direct Cool sample; other types can be 
 
 “Try a filled example” uses clearly labelled, illustrative fridge figures built into the page, so it works even when model search is unavailable. It does not claim these figures came from BEE or represent an actual model. Users should replace all sample values with their own before making a decision.
 
-`catalog.js` contains a **publishable** Supabase key and project URL for public read-only model search. Confirm the key character-for-character against your Supabase dashboard. Never put a secret or service-role key in browser code. The `public` schema and table must be exposed via the Data API, and `anon` must have a read-only `SELECT` grant and RLS policy. Search uses `brand`, `model_number`, `fridge_type`, `total_volume_l`, `annual_kwh` and `stars`.
+The browser's `catalog.js` calls `/api/models`; the Vercel function calls Supabase with a server-only key and returns only six approved catalogue columns. The `public.refrigerator_models` table must be exposed through the Supabase Data API. Browser access to that table is no longer required by this version. Search uses `brand`, `model_number`, `fridge_type`, `total_volume_l`, `annual_kwh` and `stars`. The route restricts fridge types and caps results at 60 rows.
 
-The optional **Explain with Gemini** and **Identify from photo** features need server routes and one Vercel environment variable, `GEMINI_API_KEY`. Keep this key in Vercel, never in browser files or GitHub. Both routes use `gemini-3.5-flash-lite` via the Gemini API. Google limits access to 2.5 models for new projects; the earlier 2.5 model may return HTTP 404 with a new API key. The browser stores a shared count of five AI attempts in `localStorage`, including attempts that fail after a request starts. Requests rejected for an invalid Gemini key, unavailable model, or provider quota do not consume a browser attempt. The image is sent to Gemini for identification; images, extracted text, prompts and answers are not written to Supabase. The separate, read-only refrigerator catalogue still uses Supabase. Manual entry and payback remain available if model search or Gemini is unavailable.
+The **Explain with Gemini** and **Identify from photo** functions use `gemini-3.5-flash-lite`. `GEMINI_API_KEY` and `SUPABASE_SERVICE_KEY` live only in the Vercel server environment. A row in `public.gemini_calls` is inserted before each actual Gemini request and updated with its status, sanitized input/output summary, and Google's usage token counts when available. Photo bytes are sent to Gemini but never stored in this table; the free-form question is also omitted from persistent input logs. Extracted details and generated explanations are stored. The page fetches an exact count of these rows through `/api/stats`. A pending row remains if the follow-up database update fails. If the initial insert fails, the app skips the Gemini call and shows a logging error. Manual calculation remains available.
 
-The browser count is a convenience limit only: clearing storage, changing browsers, or calling `/api/check` and `/api/label` directly bypasses it. It does not enforce a cost limit for the Gemini key. Set a provider quota or other server-side protection before a public launch if spending must be capped. If you previously created `upgradecheck_quota`, `claim_upgradecheck` or `upgrade_checks` in Supabase, the new code does not use them. It also does not delete existing data; inspect and remove obsolete objects separately if desired. The server no longer needs `SUPABASE_SERVICE_KEY` or `SUPABASE_URL`, though `catalog.js` still contains the public project URL and publishable key for fridge search.
+The separate browser count of five attempts remains a convenience limit only: clearing storage, changing browsers, or calling `/api/check` and `/api/label` directly bypasses it. The database count measures requests, **not unique visitors or a server-enforced quota**. Set a Gemini provider quota or a server-side rate limit before public launch if spending must be capped. Existing `upgradecheck_quota`, `claim_upgradecheck` or `upgrade_checks` objects are not used or deleted by this code.
+
+For assignment evidence, make at least five AI requests after deployment. In Supabase Table Editor inspect `gemini_calls`, or run the two commented queries at the bottom of `supabase/gemini_calls.sql` for five recent rows and mean input/output tokens. Record the actual values and a screenshot; do not use test fixture numbers as live measurements. The public counter includes successes, provider errors, transport errors, and pending records. It has no personal identity or per-user breakdown.
 
 ## If Google rejects the Gemini key
 
@@ -41,4 +46,4 @@ The key appearing in Vercel does not prove Google accepts it. Confirm that `GEMI
 
 ## Verify locally
 
-Run `npm test` from this repository root. To preview the interface, open root `index.html`. Supabase search requires internet access; the calculation works locally with manually entered annual units. Gemini requires the deployed server routes.
+Run `npm test` from this repository root. To preview the interface, open root `index.html`. Catalogue search, the count and Gemini require the deployed server routes. The calculator works locally with manually entered annual units.

@@ -24,6 +24,20 @@
     const remaining = aiLimit - aiAttempts();
     byId('ai-remaining').textContent = remaining + ' of ' + aiLimit + ' AI attempts remaining on this browser.';
   }
+  async function refreshRecordedCalls() {
+    if (location.protocol === 'file:') {
+      byId('gemini-call-count').textContent = 'Gemini request count is available on the deployed website.';
+      return;
+    }
+    try {
+      const response = await fetch('/api/stats', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !Number.isSafeInteger(data.recordedCalls)) throw new Error('Unavailable');
+      byId('gemini-call-count').textContent = 'Gemini requests recorded: ' + number(data.recordedCalls);
+    } catch {
+      byId('gemini-call-count').textContent = 'Gemini request count is temporarily unavailable.';
+    }
+  }
   function claimAiAttempt() {
     const used = aiAttempts();
     if (used >= aiLimit) { updateAiUsage(); return false; }
@@ -125,7 +139,7 @@
       if (version !== searchVersions[side]) return;
       refreshModels(side);
       field(side, 'source').textContent = (error && error.name === 'TypeError' ?
-        'Could not connect to Supabase from this browser. Check the project URL and network access.' :
+        'Could not reach model search. Check the network connection.' :
         error.message || 'Model search is unavailable.') + ' You can still enter the annual units from the label.';
     }
   }
@@ -410,6 +424,7 @@
     } catch (error) {
       if (version === renderVersion) message.textContent = error.message + ' Your comparison is still available.';
     } finally {
+      void refreshRecordedCalls();
       if (version === renderVersion) button.disabled = false;
     }
   });
@@ -535,7 +550,7 @@
       }
     } catch (error) {
       status.textContent = error instanceof TypeError ? 'Could not reach the photo service. Try again later or enter details manually.' : error.message;
-    } finally { button.disabled = false; }
+    } finally { void refreshRecordedCalls(); button.disabled = false; }
   }
   function usePhoto(side) {
     const d = state[side].photo;
@@ -568,4 +583,5 @@
   }
   render();
   updateAiUsage();
+  void refreshRecordedCalls();
 })();
