@@ -47,7 +47,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
     fetch: async (url, options) => {
       if (String(url).includes('/api/label')) {
         photoCalls++;
-        return photoFailure ? { ok: false, status: 503, json: async () => ({ error: 'Gemini rejected the API key. Check GEMINI_API_KEY in Vercel.' }) } :
+        return photoFailure ? { ok: false, status: 503, json: async () => ({ error: 'Google denied Gemini API access for this key or project (HTTP 403). Check its status and restrictions in Google AI Studio.' }) } :
           { ok: true, json: async () => ({ details: photoDetails, suggestion: photoSuggestion }) };
       }
       if (String(url).includes('/api/check')) {
@@ -196,5 +196,5 @@ test('model-first page calculates locally and handles missing and cross-type mod
   photoFailure = true;
   await elements['old-read-label'].listeners.click();
   assert.equal(stored.get('upgradecheck_ai_attempts_v3'), '0');
-  assert.equal(elements['old-photo-status'].textContent, 'Gemini rejected the API key. Check GEMINI_API_KEY in Vercel.');
+  assert.equal(elements['old-photo-status'].textContent, 'Google denied Gemini API access for this key or project (HTTP 403). Check its status and restrictions in Google AI Studio.');
 });

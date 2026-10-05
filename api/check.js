@@ -1,5 +1,5 @@
 import { SYSTEM_PROMPT, parseInput, compare, safeModelOutput } from '../lib/decision.js';
-import { MODEL, MAX_OUTPUT_TOKENS, config, json } from '../lib/server.js';
+import { MODEL, MAX_OUTPUT_TOKENS, config, json, geminiFailure } from '../lib/server.js';
 
 export async function POST(request) {
   if ((request.headers.get('content-length') ?? '0') > 4096) return json({ error: 'Request is too large.' }, 413);
@@ -9,7 +9,7 @@ export async function POST(request) {
 
   let cfg;
   try { cfg = config(); }
-  catch { return json({ error: 'This check is not configured yet.' }, 503); }
+  catch (error) { return json({ error: error.message }, 503); }
 
   const figures = compare(input);
   const payload = {
@@ -39,10 +39,8 @@ export async function POST(request) {
     return json({ error: 'Could not reach Gemini. Try again later.' }, 502);
   }
   if (!response.ok) {
-    if (response.status === 404) return json({ error: 'This Gemini model is not available to your API key (HTTP 404). Check the model access in Google AI Studio.' }, 503);
-    if (response.status === 401 || response.status === 403) return json({ error: 'Gemini rejected the API key. Check GEMINI_API_KEY in Vercel.' }, 503);
-    if (response.status === 429) return json({ error: 'Gemini quota was reached. Try again later.' }, 429);
-    return json({ error: 'Gemini returned HTTP ' + response.status + '. Try again later.' }, 502);
+    const failure = await geminiFailure(response);
+    return json({ error: failure.error }, failure.status);
   }
   try {
     const rawResponse = await response.json();

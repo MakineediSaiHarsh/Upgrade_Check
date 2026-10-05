@@ -35,6 +35,10 @@ The optional **Explain with Gemini** and **Identify from photo** features need s
 
 The browser count is a convenience limit only: clearing storage, changing browsers, or calling `/api/check` and `/api/label` directly bypasses it. It does not enforce a cost limit for the Gemini key. Set a provider quota or other server-side protection before a public launch if spending must be capped. If you previously created `upgradecheck_quota`, `claim_upgradecheck` or `upgrade_checks` in Supabase, the new code does not use them. It also does not delete existing data; inspect and remove obsolete objects separately if desired. The server no longer needs `SUPABASE_SERVICE_KEY` or `SUPABASE_URL`, though `catalog.js` still contains the public project URL and publishable key for fridge search.
 
+## If Google rejects the Gemini key
+
+The key appearing in Vercel does not prove Google accepts it. Confirm that `GEMINI_API_KEY` is set in the **calculator** Vercel project for the **Production** environment, with the raw key value and no surrounding quotes. New or changed environment variables need a new production deployment. In the Google AI Studio API Keys page, inspect the exact key's project, blocked status and restrictions. Google blocks certain leaked or dormant keys and rejects unrestricted standard keys; a current AI Studio auth key restricted to the Gemini API is the simplest replacement. A browser-restricted key can fail from Vercel's server, and a project-level access denial will not be solved merely by adding the same key again. The site now distinguishes these causes when Google's error body identifies them, without showing Google's raw error text or the secret. Never paste the key into a support message, screenshot, or repository.
+
 ## Verify locally
 
 Run `npm test` from this repository root. To preview the interface, open root `index.html`. Supabase search requires internet access; the calculation works locally with manually entered annual units. Gemini requires the deployed server routes.

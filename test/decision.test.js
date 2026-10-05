@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parseInput, compare, safeModelOutput, SYSTEM_PROMPT } from '../lib/decision.js';
 import { POST } from '../api/check.js';
 import { POST as POST_LABEL, parseLabel } from '../api/label.js';
+import { geminiFailure } from '../lib/server.js';
 import '../payback.js';
 
 const base={oldModel:'Old fridge',newModel:'Preferred fridge',oldUnits:400,newUnits:120,newPrice:25000,tradeIn:0,rateLow:7,rateHigh:10,concern:''};
@@ -87,6 +88,11 @@ test('missing Gemini configuration prevents an external call',async t=>{
   let calls=0;globalThis.fetch=async()=>{calls++;return Response.json(false);};
   const response=await POST(new Request('https://example.vercel.app/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)}));
   assert.equal(response.status,503);assert.equal(calls,0);
+  process.env.GEMINI_API_KEY='"quoted-test-key"';
+  const quoted=await POST(new Request('https://example.vercel.app/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)}));
+  assert.equal(quoted.status,503);
+  assert.match((await quoted.json()).error,/without quotation marks/);
+  assert.equal(calls,0);
 });
 
 test('label reading returns reviewable fields without contacting Supabase',async t=>{
@@ -149,7 +155,7 @@ test('Gemini key and quota failures are distinguishable from an unreadable photo
   globalThis.fetch=async()=>new Response(null,{status:403});
   const invalid=await POST_LABEL(request());
   assert.equal(invalid.status,503);
-  assert.match((await invalid.json()).error,/API key.*Vercel/);
+  assert.match((await invalid.json()).error,/denied Gemini API access.*403/);
   globalThis.fetch=async()=>new Response(null,{status:404});
   const unavailable=await POST_LABEL(request());
   assert.equal(unavailable.status,503);
@@ -167,4 +173,19 @@ test('Gemini key and quota failures are distinguishable from an unreadable photo
   const noClues=await POST_LABEL(request([{brand:'LG',model:'GLD235',type:'direct_cool'}]));
   assert.equal(noClues.status,422);
   assert.match((await noClues.json()).error,/did not show a recognizable/);
+});
+
+test('Gemini permission errors report a safe cause without returning upstream text',async()=>{
+  const upstream=message=>Response.json({error:{message,code:403,status:'PERMISSION_DENIED'}},{status:403});
+  const leaked=await geminiFailure(upstream('Your API key was reported as leaked. Secret: DO_NOT_ECHO'));
+  assert.match(leaked.error,/blocked.*leaked/);
+  assert.doesNotMatch(leaked.error,/DO_NOT_ECHO/);
+  const project=await geminiFailure(upstream('Your project has been denied access. Please contact support.'));
+  assert.match(project.error,/denied this project access/);
+  const restricted=await geminiFailure(upstream('Requests from referer <empty> are blocked.'));
+  assert.match(restricted.error,/application restrictions.*Vercel/);
+  const invalid=await geminiFailure(upstream('A 403 without a recognized reason.'));
+  assert.match(invalid.error,/key or project/);
+  const unrestricted=await geminiFailure(upstream('Unrestricted standard key is not permitted.'));
+  assert.match(unrestricted.error,/unrestricted standard key/);
 });
