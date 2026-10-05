@@ -4,7 +4,9 @@ import fs from 'node:fs/promises';
 import vm from 'node:vm';
 
 test('model-first page calculates locally and handles missing and cross-type models', async () => {
-  const html = await fs.readFile(new URL('../calculator/index.html', import.meta.url), 'utf8');
+  const html = await fs.readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /href="\.\.\/index\.html"|src="models\.js"/);
+  assert.match(html, /<script src="catalog\.js"><\/script>/);
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
   assert.equal(ids.length, new Set(ids).size);
   const elements = Object.fromEntries(ids.map(id => [id, {
@@ -48,7 +50,7 @@ test('model-first page calculates locally and handles missing and cross-type mod
   context.window = context;
   vm.createContext(context);
   for (const file of ['catalog.js', 'payback.js', 'app.js']) {
-    vm.runInContext(await fs.readFile(new URL('../calculator/' + file, import.meta.url), 'utf8'), context, { filename: file });
+    vm.runInContext(await fs.readFile(new URL('../' + file, import.meta.url), 'utf8'), context, { filename: file });
   }
   await elements['try-sample'].listeners.click();
   assert.equal(queries.length, 2);

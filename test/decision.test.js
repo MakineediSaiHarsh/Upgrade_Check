@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseInput, compare, safeModelOutput, SYSTEM_PROMPT } from '../lib/decision.js';
 import { POST } from '../api/check.js';
 import { POST as POST_LABEL, parseLabel } from '../api/label.js';
-import '../calculator/payback.js';
+import '../payback.js';
 
 const base={oldModel:'Old fridge',newModel:'Preferred fridge',oldUnits:400,newUnits:120,newPrice:25000,tradeIn:0,rateLow:7,rateHigh:10,concern:''};
 
